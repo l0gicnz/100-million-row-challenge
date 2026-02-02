@@ -1,0 +1,5 @@
+vendor/
+data.csv
+.idea
+.tempest
+composer.lock

@@ -1,0 +1,13 @@
+{
+    "require": {
+        "php": "^8.4",
+        "tempest/framework": "3.x-dev"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
