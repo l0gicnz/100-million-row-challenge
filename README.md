@@ -9,7 +9,7 @@ composer install
 php tempest data:generate
 ```
 
-By default, the `data:generate` command will generate a dataset of 1,000,000 visits. The real benchmark will use 1,000,000,000 visits. Next, implement your solution in `app/Parser.php`:
+By default, the `data:generate` command will generate a dataset of 1,000,000 visits. The real benchmark will use 100,000,000 visits. Next, implement your solution in `app/Parser.php`:
 
 ```php
 final class Parser
@@ -67,3 +67,9 @@ Your parser should store the following output in `$outputPath` as a JSON file:
 ## Submitting your solution
 
 Send a pull request to this repository with your solution. The title of your pull request should simply be your GitHub's username. If your solution validates, we'll run it on the benchmark server and store your time in [leaderboard.csv](./leaderboard.csv). You can continue to improve your solution, but keep in mind that benchmarks are manually triggered and you might need to wait a while before your results are published.
+
+## FAQ
+
+#### Why not one billion?
+
+This challenge was inspired by the [1 billion row challenge in Java](https://github.com/gunnarmorling/1brc). The reason we're using only 100 million rows is because this version has a lot more complexity compared to the Java version (date parsing, JSON encoding, array sorting). To prevent the benchmark server from being overloaded, we're limiting the number of rows to 100 million.
