@@ -64,7 +64,8 @@ jobs:
           
             git fetch --prune origin
             git checkout main
-            git pull origin main
+            git reset --hard origin/main
+          
             git branch -D \"$BRANCH\" 2>/dev/null || true
             git fetch origin \"$FETCH_REF:$BRANCH\"
             git checkout \"$BRANCH\"
