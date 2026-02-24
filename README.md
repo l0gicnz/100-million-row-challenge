@@ -106,7 +106,7 @@ The benchmark results of each run are stored in [leaderboard.csv](./leaderboard.
 
 #### What kind of server is used for the benchmark?
 
-The benchmark runs on a Premium Intel Digital Ocean Droplet with 2vCPU and 2GB of memory. We deliberately chose not to use a more powerful server because we like to test in a somewhat "standard" environment for PHP.
+The benchmark runs on a Premium Intel Digital Ocean Droplet with 2vCPU and 1.5GB of available memory. We deliberately chose not to use a more powerful server because we like to test in a somewhat "standard" environment for PHP.
 
 #### How to ensure fair results?
 
