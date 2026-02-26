@@ -86,6 +86,7 @@ final class BenchmarkRunCommand
             try {
                 $result = $this->processPR($prData);
                 $this->addLeaderboardResult($prNumber, $prTitle, $result);
+                $this->githubRemoveLabel($prNumber, 'bench_needed');
             } finally {
                 // Always remove the verified label
                 $this->githubRemoveLabel($prNumber, 'verified');
