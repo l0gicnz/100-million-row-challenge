@@ -7,7 +7,6 @@ namespace App;
 final class Parser
 {
     private const WORKERS = 4;
-    private const BUFFER_SIZE = 8192;
 
     public function parse(string $inputPath, string $outputPath): void
     {
@@ -53,8 +52,8 @@ final class Parser
         $merged = [];
         foreach ($sockets as $socket) {
             $data = '';
-            while (!feof($socket)) {
-                $data .= fread($socket, 65536);
+            while (!feof($socket) && ($chunk = fread($socket, 1048576)) !== false) {
+                $data .= $chunk;
             }
             fclose($socket);
             
@@ -73,8 +72,6 @@ final class Parser
         foreach ($pids as $pid) pcntl_waitpid($pid, $status);
 
         $json = json_encode($merged, JSON_PRETTY_PRINT);
-        $json = str_replace("\n", "\r\n", $json);
-        
         $fp = fopen($outputPath, 'wb');
         fwrite($fp, $json);
         fclose($fp);
@@ -107,7 +104,11 @@ final class Parser
             if (($h = strpos($path, '#')) !== false) $path = substr($path, 0, $h);
             $path = ($path === '' || $path === false) ? '/' : $path;
 
-            $results[$path][$date] = ($results[$path][$date] ?? 0) + 1;
+            if (isset($results[$path][$date])) {
+                $results[$path][$date]++;
+            } else {
+                $results[$path][$date] = 1;
+            }
         }
         fclose($fp);
 
