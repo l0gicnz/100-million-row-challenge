@@ -6,15 +6,14 @@ namespace App;
 
 final class Parser
 {
-    private const WORKERS = 8;
-    private const BUFFER_SIZE = 65536;
+    private const WORKERS = 8;            // Match physical cores
+    private const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB read buffer
 
     public function parse(string $inputPath, string $outputPath): void
     {
-        ini_set('memory_limit', '4G');
+        ini_set('memory_limit', '8G');
 
-        $canFork = function_exists('pcntl_fork');
-        if (!$canFork) {
+        if (!function_exists('pcntl_fork')) {
             $this->singleProcessFallback($inputPath, $outputPath);
             return;
         }
@@ -22,77 +21,85 @@ final class Parser
         $fileSize = filesize($inputPath);
         $numWorkers = self::WORKERS;
 
+        // Calculate start positions per worker
         $starts = [0];
         $fp = fopen($inputPath, 'rb');
         for ($w = 1; $w < $numWorkers; $w++) {
             fseek($fp, (int) ($w * $fileSize / $numWorkers));
-            fgets($fp);
+            fgets($fp); // move to next line
             $starts[$w] = ftell($fp);
         }
         $starts[$numWorkers] = $fileSize;
         fclose($fp);
 
-        $sockets = [];
         $pids = [];
+        $tempFiles = [];
 
+        // Fork workers
         for ($w = 0; $w < $numWorkers; $w++) {
-            $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
-
             $pid = pcntl_fork();
             if ($pid === 0) {
-                fclose($pair[0]);
-                $this->processChunkSocket($inputPath, $starts[$w], $starts[$w + 1], $pair[1]);
-                fclose($pair[1]);
+                $this->processChunkFile($inputPath, $starts[$w], $starts[$w + 1], $w);
                 exit(0);
             }
-            fclose($pair[1]);
-            $sockets[] = $pair[0];
             $pids[] = $pid;
+            $tempFiles[] = sys_get_temp_dir() . "/parser_worker_$w.tmp";
         }
 
-        $merged = [];
-        foreach ($sockets as $socket) {
-            $data = '';
-            while (!feof($socket) && ($chunk = fread($socket, 1048576)) !== false) {
-                $data .= $chunk;
-            }
-            fclose($socket);
-
-            $chunk = igbinary_unserialize($data);
-            if (is_array($chunk)) {
-                foreach ($chunk as $path => $dates) {
-                    if (!isset($merged[$path])) $merged[$path] = [];
-                    foreach ($dates as $date => $count) {
-                        $merged[$path][$date] = ($merged[$path][$date] ?? 0) + $count;
-                    }
-                }
-            }
-            unset($chunk);
-        }
-
+        // Wait for all workers
         foreach ($pids as $pid) pcntl_waitpid($pid, $status);
 
-        // Sort each path's dates ascending
+        // Merge worker temp files
+        $merged = [];
+        foreach ($tempFiles as $file) {
+            $data = unserialize(file_get_contents($file));
+            if (!is_array($data)) continue;
+
+            foreach ($data as $path => $dates) {
+                if (!isset($merged[$path])) $merged[$path] = [];
+                foreach ($dates as $date => $count) {
+                    $merged[$path][$date] = ($merged[$path][$date] ?? 0) + $count;
+                }
+            }
+
+            unlink($file);
+        }
+
+        // Sort dates per path
         foreach ($merged as &$dates) {
             ksort($dates);
         }
         unset($dates);
 
-        $json = json_encode($merged, JSON_PRETTY_PRINT);
+        // Stream JSON output exactly like original
+        $out = fopen($outputPath, 'wb');
+        fwrite($out, "{\n");
+        $firstPath = true;
+        foreach ($merged as $path => $dates) {
+            if (!$firstPath) fwrite($out, ",\n");
 
-        file_put_contents($outputPath, $json);
+            $jsonDates = json_encode($dates, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $lines = explode("\n", $jsonDates);
+            foreach ($lines as $i => &$line) {
+                if ($i > 0) $line = '    ' . $line;
+            }
+            $indentedDates = implode("\n", $lines);
+
+            fwrite($out, "    " . json_encode($path) . ": {$indentedDates}");
+            $firstPath = false;
+        }
+        fwrite($out, "\n}");
+        fclose($out);
     }
 
-    private function processChunkSocket(string $filePath, int $start, int $end, $socket): void
+    private function processChunkFile(string $filePath, int $start, int $end, int $workerIndex): void
     {
         $fp = fopen($filePath, 'rb');
         fseek($fp, $start);
 
         $results = [];
-        $current = $start;
-
-        while ($current < $end && ($line = fgets($fp)) !== false) {
-            $current += strlen($line);
+        while (($line = fgets($fp)) !== false) {
+            if (ftell($fp) > $end) break;
 
             $parts = explode(',', $line, 2);
             if (count($parts) < 2) continue;
@@ -100,22 +107,13 @@ final class Parser
             $date = substr($date, 0, 10);
 
             $path = $this->normalizePath($url);
-
-            if (isset($results[$path][$date])) {
-                $results[$path][$date]++;
-            } else {
-                $results[$path][$date] = 1;
-            }
+            $results[$path][$date] = ($results[$path][$date] ?? 0) + 1;
         }
         fclose($fp);
 
-        // Sort dates in this chunk ascending
-        foreach ($results as &$dates) {
-            ksort($dates);
-        }
-        unset($dates);
-
-        fwrite($socket, igbinary_serialize($results));
+        // Serialize array to temp file (fast and memory efficient)
+        $tempFile = sys_get_temp_dir() . "/parser_worker_$workerIndex.tmp";
+        file_put_contents($tempFile, serialize($results));
     }
 
     private function singleProcessFallback(string $inputPath, string $outputPath): void
@@ -129,19 +127,33 @@ final class Parser
             $date = substr($date, 0, 10);
 
             $path = $this->normalizePath($url);
-
             $merged[$path][$date] = ($merged[$path][$date] ?? 0) + 1;
         }
         fclose($fp);
 
-        // Sort each path's dates ascending
         foreach ($merged as &$dates) {
             ksort($dates);
         }
         unset($dates);
 
-        $json = json_encode($merged, JSON_PRETTY_PRINT);
-        file_put_contents($outputPath, $json);
+        $out = fopen($outputPath, 'wb');
+        fwrite($out, "{\n");
+        $firstPath = true;
+        foreach ($merged as $path => $dates) {
+            if (!$firstPath) fwrite($out, ",\n");
+
+            $jsonDates = json_encode($dates, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $lines = explode("\n", $jsonDates);
+            foreach ($lines as $i => &$line) {
+                if ($i > 0) $line = '    ' . $line;
+            }
+            $indentedDates = implode("\n", $lines);
+
+            fwrite($out, "    " . json_encode($path) . ": {$indentedDates}");
+            $firstPath = false;
+        }
+        fwrite($out, "\n}");
+        fclose($out);
     }
 
     private function normalizePath(string $url): string
