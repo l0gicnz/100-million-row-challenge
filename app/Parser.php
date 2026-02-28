@@ -6,12 +6,17 @@ namespace App;
 
 final class Parser
 {
+<<<<<<< HEAD
     private const WORKERS = 4;
+=======
+    private const WORKERS = 8;
+    private const BUFFER_SIZE = 65536;
+>>>>>>> WSL
 
     public function parse(string $inputPath, string $outputPath): void
     {
-        ini_set('memory_limit', '1G');
-        
+        ini_set('memory_limit', '4G');
+
         $canFork = function_exists('pcntl_fork');
         if (!$canFork) {
             $this->singleProcessFallback($inputPath, $outputPath);
@@ -36,7 +41,7 @@ final class Parser
 
         for ($w = 0; $w < $numWorkers; $w++) {
             $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
-            
+
             $pid = pcntl_fork();
             if ($pid === 0) {
                 fclose($pair[0]);
@@ -56,8 +61,8 @@ final class Parser
                 $data .= $chunk;
             }
             fclose($socket);
-            
-            $chunk = unserialize($data);
+
+            $chunk = igbinary_unserialize($data);
             if (is_array($chunk)) {
                 foreach ($chunk as $path => $dates) {
                     if (!isset($merged[$path])) $merged[$path] = [];
@@ -71,38 +76,40 @@ final class Parser
 
         foreach ($pids as $pid) pcntl_waitpid($pid, $status);
 
+        // Sort each path's dates ascending
+        foreach ($merged as &$dates) {
+            ksort($dates);
+        }
+        unset($dates);
+
         $json = json_encode($merged, JSON_PRETTY_PRINT);
+<<<<<<< HEAD
         $fp = fopen($outputPath, 'wb');
         fwrite($fp, $json);
         fclose($fp);
+=======
+
+        file_put_contents($outputPath, $json);
+>>>>>>> WSL
     }
 
     private function processChunkSocket(string $filePath, int $start, int $end, $socket): void
     {
         $fp = fopen($filePath, 'rb');
         fseek($fp, $start);
-        
+
         $results = [];
         $current = $start;
 
         while ($current < $end && ($line = fgets($fp)) !== false) {
             $current += strlen($line);
-            $comma = strpos($line, ',');
-            if ($comma === false) continue;
 
-            $url = substr($line, 0, $comma);
-            $date = substr($line, $comma + 1, 10);
-            
-            $path = $url;
-            $schemePos = strpos($path, '://');
-            if ($schemePos !== false) {
-                $firstSlash = strpos($path, '/', $schemePos + 3);
-                $path = ($firstSlash !== false) ? substr($path, $firstSlash) : '/';
-            }
-            
-            if (($q = strpos($path, '?')) !== false) $path = substr($path, 0, $q);
-            if (($h = strpos($path, '#')) !== false) $path = substr($path, 0, $h);
-            $path = ($path === '' || $path === false) ? '/' : $path;
+            $parts = explode(',', $line, 2);
+            if (count($parts) < 2) continue;
+            [$url, $date] = $parts;
+            $date = substr($date, 0, 10);
+
+            $path = $this->normalizePath($url);
 
             if (isset($results[$path][$date])) {
                 $results[$path][$date]++;
@@ -112,7 +119,13 @@ final class Parser
         }
         fclose($fp);
 
-        fwrite($socket, serialize($results));
+        // Sort dates in this chunk ascending
+        foreach ($results as &$dates) {
+            ksort($dates);
+        }
+        unset($dates);
+
+        fwrite($socket, igbinary_serialize($results));
     }
 
     private function singleProcessFallback(string $inputPath, string $outputPath): void
@@ -120,13 +133,38 @@ final class Parser
         $fp = fopen($inputPath, 'rb');
         $merged = [];
         while (($line = fgets($fp)) !== false) {
-            $comma = strpos($line, ',');
-            if ($comma === false) continue;
-            $url = substr($line, 0, $comma);
-            $date = substr($line, $comma + 1, 10);
-            $path = $url;
+            $parts = explode(',', $line, 2);
+            if (count($parts) < 2) continue;
+            [$url, $date] = $parts;
+            $date = substr($date, 0, 10);
+
+            $path = $this->normalizePath($url);
+
             $merged[$path][$date] = ($merged[$path][$date] ?? 0) + 1;
         }
         fclose($fp);
+
+        // Sort each path's dates ascending
+        foreach ($merged as &$dates) {
+            ksort($dates);
+        }
+        unset($dates);
+
+        $json = json_encode($merged, JSON_PRETTY_PRINT);
+        file_put_contents($outputPath, $json);
+    }
+
+    private function normalizePath(string $url): string
+    {
+        $schemePos = strpos($url, '://');
+        if ($schemePos !== false) {
+            $firstSlash = strpos($url, '/', $schemePos + 3);
+            $url = ($firstSlash !== false) ? substr($url, $firstSlash) : '/';
+        }
+
+        if (($q = strpos($url, '?')) !== false) $url = substr($url, 0, $q);
+        if (($h = strpos($url, '#')) !== false) $url = substr($url, 0, $h);
+
+        return $url === '' ? '/' : $url;
     }
 }
