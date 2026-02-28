@@ -49,7 +49,7 @@ final class Parser
 {
     private const int WORKERS    = 8;
     private const int CHUNKS     = 16;
-    private const int READ_CHUNK = 1_048_576; // Increased to 1MB for M1 NVMe
+    private const int READ_CHUNK = 524_288;
     private const int DISC_SIZE  = 2_097_152;
     private const int PREFIX_LEN = 25;
 
