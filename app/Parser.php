@@ -6,12 +6,8 @@ namespace App;
 
 final class Parser
 {
-<<<<<<< HEAD
-    private const WORKERS = 4;
-=======
     private const WORKERS = 8;
     private const BUFFER_SIZE = 65536;
->>>>>>> WSL
 
     public function parse(string $inputPath, string $outputPath): void
     {
@@ -83,14 +79,8 @@ final class Parser
         unset($dates);
 
         $json = json_encode($merged, JSON_PRETTY_PRINT);
-<<<<<<< HEAD
-        $fp = fopen($outputPath, 'wb');
-        fwrite($fp, $json);
-        fclose($fp);
-=======
 
         file_put_contents($outputPath, $json);
->>>>>>> WSL
     }
 
     private function processChunkSocket(string $filePath, int $start, int $end, $socket): void
