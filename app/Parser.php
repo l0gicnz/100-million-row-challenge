@@ -31,10 +31,10 @@ use const WNOHANG;
 
 final class Parser
 {
-    private const BUFFER_SIZE   = 16 * 1024 * 1024; // 4 MB buffer
-    private const DISCOVER_SIZE = 2 * 1024 * 1024;
+    private const BUFFER_SIZE   = 16 * 1024 * 1024;
+    private const DISCOVER_SIZE = 8 * 1024 * 1024;
     private const PREFIX_LEN    = 25;
-    private const WORKERS       = 10; // adjust to CPU cores
+    private const WORKERS       = 16;
 
     public function parse($inputPath, $outputPath)
     {
