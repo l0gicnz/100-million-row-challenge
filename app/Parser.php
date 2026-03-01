@@ -253,7 +253,11 @@ final class Parser
         $pid = getmypid();
         $config = ['enabled' => true, 'handles' => [], 'temp_prefix' => sys_get_temp_dir() . "/p100_$pid"];
         for ($i = 0; $i < self::WORKER_COUNT - 1; $i++) {
-            $shm = @shmop_open($pid + 100 + $i, 'c', 0644, $size);
+            try {
+                $shm = shmop_open($pid + 100 + $i, 'c', 0644, $size);
+            } catch (\Throwable) {
+                $shm = false;
+            }
             if (!$shm) { $config['enabled'] = false; break; }
             $config['handles'][$i] = $shm;
         }
