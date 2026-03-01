@@ -3,7 +3,45 @@
 namespace App;
 
 use App\Commands\Visit;
-//use RuntimeException;
+
+use function strpos;
+
+use function strrpos;
+use function substr;
+use function strlen;
+use function fread;
+use function fseek;
+use function fwrite;
+use function fopen;
+use function fclose;
+use function fgets;
+use function ftell;
+use function pack;
+use function unpack;
+use function array_fill;
+use function array_count_values;
+use function implode;
+use function str_replace;
+use function count;
+use function chr;
+use function gc_disable;
+use function getmypid;
+use function pcntl_fork;
+use function pcntl_wait;
+use function sem_acquire;
+use function sem_get;
+use function sem_release;
+use function sem_remove;
+use function shmop_delete;
+use function shmop_open;
+use function shmop_read;
+use function shmop_write;
+use function set_error_handler;
+use function stream_set_read_buffer;
+use function stream_set_write_buffer;
+use function sys_get_temp_dir;
+
+use const SEEK_CUR;
 
 final class Parser
 {
@@ -62,7 +100,6 @@ final class Parser
         $pids = [];
         for ($i = 0; $i < self::WORKER_COUNT - 1; $i++) {
             $pid = pcntl_fork();
-            if ($pid === -1) throw new RuntimeException("Fork failed");
 
             if ($pid === 0) {
                 $this->runWorker($input, $boundaries, $slugMap, $dateIdBinary, $queue, $shmConfig, $i);
@@ -77,7 +114,6 @@ final class Parser
 
         while (count($pids) > 0) {
             $pid = pcntl_wait($status);
-            if (!isset($pids[$pid])) continue;
             
             $workerIdx = $pids[$pid];
             unset($pids[$pid]);
@@ -86,9 +122,6 @@ final class Parser
             $workerCounts = unpack('v*', $workerData);
             
             $totalCount = count($workerCounts);
-            //for ($j = 1; $j <= $totalCount; $j++) {
-            //    $aggregated[$j - 1] += $workerCounts[$j];
-            //}
             for ($j = 0; $j < $totalCount; $j++) {
                 $aggregated[$j] += $workerCounts[$j + 1];
             }
@@ -148,11 +181,7 @@ final class Parser
         $counts = $this->processBuckets($buckets, count($slugMap), count($dateBytes));
         $packed = pack('v*', ...$counts);
 
-        if ($shm['enabled']) {
-            shmop_write($shm['handles'][$idx], $packed, 0);
-        } else {
-            file_put_contents($shm['temp_prefix'] . $idx, $packed);
-        }
+        shmop_write($shm['handles'][$idx], $packed, 0);
     }
 
     private function consumeQueue($path, $splits, $slugMap, $dateBytes, $queue, &$buckets): void
@@ -172,14 +201,12 @@ final class Parser
         $bufSize = self::READ_BUFFER;
 
         while ($remaining > 0) {
-            //$buffer = fread($fh, min($remaining, $bufSize));
             $buffer = fread($fh, $remaining > $bufSize ? $bufSize : $remaining);
             if ($buffer === false || $buffer === '') break;
             
             $len = strlen($buffer);
             $remaining -= $len;
             $lastNl = strrpos($buffer, "\n");
-            if ($lastNl === false) continue;
 
             $overhang = $len - $lastNl - 1;
             if ($overhang > 0) {
@@ -248,27 +275,14 @@ final class Parser
 
     private function nextJob(array $queue): int
     {
-        if ($queue['type'] === 'sem') {
-            sem_acquire($queue['sem']);
-            $val = unpack('V', shmop_read($queue['shm'], 0, 4))[1];
-            if ($val < self::SEGMENT_COUNT) {
-                shmop_write($queue['shm'], pack('V', $val + 1), 0);
-            } else {
-                $val = -1;
-            }
-            sem_release($queue['sem']);
-            return $val;
-        }
-        flock($queue['fh'], LOCK_EX);
-        fseek($queue['fh'], 0);
-        $val = unpack('V', fread($queue['fh'], 4))[1];
+        sem_acquire($queue['sem']);
+        $val = unpack('V', shmop_read($queue['shm'], 0, 4))[1];
         if ($val < self::SEGMENT_COUNT) {
-            fseek($queue['fh'], 0);
-            fwrite($queue['fh'], pack('V', $val + 1));
+            shmop_write($queue['shm'], pack('V', $val + 1), 0);
         } else {
             $val = -1;
         }
-        flock($queue['fh'], LOCK_UN);
+        sem_release($queue['sem']);
         return $val;
     }
 
@@ -308,37 +322,21 @@ final class Parser
         $sem = @sem_get($pid + 1, 1, 0644, true);
         $shm = @shmop_open($pid + 2, 'c', 0644, 4);
         set_error_handler(null);
-        if ($sem && $shm) {
-            shmop_write($shm, pack('V', 0), 0);
-            return ['type' => 'sem', 'sem' => $sem, 'shm' => $shm];
-        }
-        $f = sys_get_temp_dir() . "/q_$pid";
-        file_put_contents($f, pack('V', 0));
-        return ['type' => 'file', 'fh' => fopen($f, 'c+b'), 'path' => $f];
+        shmop_write($shm, pack('V', 0), 0);
+        return ['type' => 'sem', 'sem' => $sem, 'shm' => $shm];
     }
 
     private function retrieveWorkerResult(array $config, int $idx): string
     {
-        if ($config['enabled']) {
-            $data = shmop_read($config['handles'][$idx], 0, 0);
-            shmop_delete($config['handles'][$idx]);
-            return $data;
-        }
-        $path = $config['temp_prefix'] . $idx;
-        $data = file_get_contents($path);
-        @unlink($path);
+        $data = shmop_read($config['handles'][$idx], 0, 0);
+        shmop_delete($config['handles'][$idx]);
         return $data;
     }
 
     private function cleanupIPC(array $shm, array $queue): void
     {
-        if ($queue['type'] === 'sem') {
-            shmop_delete($queue['shm']);
-            sem_remove($queue['sem']);
-        } else {
-            fclose($queue['fh']);
-            @unlink($queue['path']);
-        }
+        shmop_delete($queue['shm']);
+        sem_remove($queue['sem']);
     }
 
     private function generateJson(string $out, array $counts, array $slugs, array $dates): void
