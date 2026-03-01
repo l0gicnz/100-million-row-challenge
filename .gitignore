@@ -12,3 +12,4 @@ test-data-actual.json
 .DS_Store
 .benchmark
 debug.php
+test.php
