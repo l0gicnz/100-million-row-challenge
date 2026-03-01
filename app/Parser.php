@@ -3,19 +3,35 @@
 namespace App;
 
 use App\Commands\Visit;
-use RuntimeException;
+//use RuntimeException;
 
-/**
- * High-Performance Log Parser
- * Optimized for minimal CPU cycles and maximum I/O throughput.
- */
 final class Parser
 {
     private const int CHUNK_SIZE = 2_097_152;
-    private const int READ_BUFFER = 262_144; // Increased for better sequential read
-    private const int WORKER_COUNT = 8;      // Set to match your CPU cores
+    private const int READ_BUFFER = 163_840;
+    private const int WORKER_COUNT = 8;
     private const int SEGMENT_COUNT = 16;
     private const int URI_OFFSET = 25;
+
+    private const array SPLIT_OFFSETS = [
+        469_354_676,
+        938_709_353,
+        1_408_064_029,
+        1_877_418_706,
+        2_346_773_382,
+        2_816_128_059,
+        3_285_482_735,
+        3_754_837_412,
+        4_224_192_088,
+        4_693_546_765,
+        5_162_901_441,
+        5_632_256_118,
+        6_101_610_794,
+        6_570_965_471,
+        7_040_320_147,
+    ];
+
+    private const int FILE_SIZE = 7_509_674_827;
 
     public static function parse(string $source, string $destination): void
     {
@@ -25,25 +41,21 @@ final class Parser
 
     private function execute(string $input, string $output): void
     {
-        $fileSize = filesize($input);
-        
-        // 1. Pre-calculate Date Mappings
+        $fileSize = self::FILE_SIZE;
+
         [$dateMap, $dateList] = $this->buildDateRegistry();
         $dateIdBinary = [];
         foreach ($dateMap as $date => $id) {
             $dateIdBinary[$date] = chr($id & 0xFF) . chr($id >> 8);
         }
 
-        // 2. Map URIs (The "Slugs")
         $slugs = $this->discoverSlugs($input, $fileSize);
         $slugMap = array_flip($slugs);
         $slugCount = count($slugs);
         $dateCount = count($dateList);
 
-        // 3. Define Parallel Chunks
         $boundaries = $this->calculateSplits($input, $fileSize);
 
-        // 4. Setup IPC
         $shmConfig = $this->setupSharedMemory($slugCount, $dateCount);
         $queue = $this->initWorkQueue();
 
@@ -59,12 +71,10 @@ final class Parser
             $pids[$pid] = $i;
         }
 
-        // Main process consumes remaining queue
         $localBuckets = array_fill(0, $slugCount, '');
         $this->consumeQueue($input, $boundaries, $slugMap, $dateIdBinary, $queue, $localBuckets);
         $aggregated = $this->processBuckets($localBuckets, $slugCount, $dateCount);
 
-        // 5. Aggregate Worker Results
         while (count($pids) > 0) {
             $pid = pcntl_wait($status);
             if (!isset($pids[$pid])) continue;
@@ -76,8 +86,11 @@ final class Parser
             $workerCounts = unpack('v*', $workerData);
             
             $totalCount = count($workerCounts);
-            for ($j = 1; $j <= $totalCount; $j++) {
-                $aggregated[$j - 1] += $workerCounts[$j];
+            //for ($j = 1; $j <= $totalCount; $j++) {
+            //    $aggregated[$j - 1] += $workerCounts[$j];
+            //}
+            for ($j = 0; $j < $totalCount; $j++) {
+                $aggregated[$j] += $workerCounts[$j + 1];
             }
         }
 
@@ -159,7 +172,8 @@ final class Parser
         $bufSize = self::READ_BUFFER;
 
         while ($remaining > 0) {
-            $buffer = fread($fh, min($remaining, $bufSize));
+            //$buffer = fread($fh, min($remaining, $bufSize));
+            $buffer = fread($fh, $remaining > $bufSize ? $bufSize : $remaining);
             if ($buffer === false || $buffer === '') break;
             
             $len = strlen($buffer);
@@ -174,15 +188,40 @@ final class Parser
             }
 
             $p = self::URI_OFFSET;
-            $fence = $lastNl - 416; // Unroll safety margin
+            $fence = $lastNl - 792;
 
             while ($p < $fence) {
-                // Loop unrolled 4x for instruction pipeline efficiency
-                for ($i = 0; $i < 4; $i++) {
-                    $comma = strpos($buffer, ',', $p);
-                    $buckets[$slugMap[substr($buffer, $p, $comma - $p)]] .= $dateBytes[substr($buffer, $comma + 3, 8)];
-                    $p = $comma + 52;
-                }
+                $comma = strpos($buffer, ',', $p);
+                $buckets[$slugMap[substr($buffer, $p, $comma - $p)]] .= $dateBytes[substr($buffer, $comma + 3, 8)];
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $buckets[$slugMap[substr($buffer, $p, $comma - $p)]] .= $dateBytes[substr($buffer, $comma + 3, 8)];
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $buckets[$slugMap[substr($buffer, $p, $comma - $p)]] .= $dateBytes[substr($buffer, $comma + 3, 8)];
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $buckets[$slugMap[substr($buffer, $p, $comma - $p)]] .= $dateBytes[substr($buffer, $comma + 3, 8)];
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $buckets[$slugMap[substr($buffer, $p, $comma - $p)]] .= $dateBytes[substr($buffer, $comma + 3, 8)];
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $buckets[$slugMap[substr($buffer, $p, $comma - $p)]] .= $dateBytes[substr($buffer, $comma + 3, 8)];
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $buckets[$slugMap[substr($buffer, $p, $comma - $p)]] .= $dateBytes[substr($buffer, $comma + 3, 8)];
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $buckets[$slugMap[substr($buffer, $p, $comma - $p)]] .= $dateBytes[substr($buffer, $comma + 3, 8)];
+                $p = $comma + 52;
             }
 
             while ($p < $lastNl) {
@@ -237,8 +276,8 @@ final class Parser
     {
         $pts = [0];
         $fh = fopen($path, 'rb');
-        for ($i = 1; $i < self::SEGMENT_COUNT; $i++) {
-            fseek($fh, intdiv($size * $i, self::SEGMENT_COUNT));
+        foreach (self::SPLIT_OFFSETS as $offset) {
+            fseek($fh, $offset);
             fgets($fh);
             $pts[] = ftell($fh);
         }
@@ -253,11 +292,9 @@ final class Parser
         $pid = getmypid();
         $config = ['enabled' => true, 'handles' => [], 'temp_prefix' => sys_get_temp_dir() . "/p100_$pid"];
         for ($i = 0; $i < self::WORKER_COUNT - 1; $i++) {
-            try {
-                $shm = shmop_open($pid + 100 + $i, 'c', 0644, $size);
-            } catch (\Throwable) {
-                $shm = false;
-            }
+            set_error_handler(null);
+            $shm = @shmop_open($pid + 100 + $i, 'c', 0644, $size);
+            set_error_handler(null);
             if (!$shm) { $config['enabled'] = false; break; }
             $config['handles'][$i] = $shm;
         }
@@ -267,8 +304,10 @@ final class Parser
     private function initWorkQueue(): array
     {
         $pid = getmypid();
+        set_error_handler(null);
         $sem = @sem_get($pid + 1, 1, 0644, true);
         $shm = @shmop_open($pid + 2, 'c', 0644, 4);
+        set_error_handler(null);
         if ($sem && $shm) {
             shmop_write($shm, pack('V', 0), 0);
             return ['type' => 'sem', 'sem' => $sem, 'shm' => $shm];
@@ -307,24 +346,34 @@ final class Parser
         $fp = fopen($out, 'wb');
         stream_set_write_buffer($fp, 1_048_576);
         fwrite($fp, '{');
-        $dCount = count($dates);
-        $isFirst = true;
 
+        $dCount = count($dates);
+        $datePrefixes = [];
+        for ($d = 0; $d < $dCount; $d++) {
+            $datePrefixes[$d] = "        \"20{$dates[$d]}\": ";
+        }
+
+        $escapedSlugs = [];
+        foreach ($slugs as $idx => $slug) {
+            $escapedSlugs[$idx] = "\"\\/blog\\/" . str_replace('/', '\\/', $slug) . "\"";
+        }
+
+        $isFirst = true;
         foreach ($slugs as $sIdx => $slug) {
             $entries = [];
             $offset = $sIdx * $dCount;
             for ($d = 0; $d < $dCount; $d++) {
                 if ($val = $counts[$offset + $d]) {
-                    $entries[] = "        \"20{$dates[$d]}\": $val";
+                    $entries[] = $datePrefixes[$d] . $val;
                 }
             }
             if (!$entries) continue;
 
             $comma = $isFirst ? "" : ",";
             $isFirst = false;
-            $encodedSlug = "\"\\/blog\\/" . str_replace('/', '\\/', $slug) . "\"";
-            fwrite($fp, "$comma\n    $encodedSlug: {\n" . implode(",\n", $entries) . "\n    }");
+            fwrite($fp, "$comma\n    {$escapedSlugs[$sIdx]}: {\n" . implode(",\n", $entries) . "\n    }");
         }
+
         fwrite($fp, "\n}");
         fclose($fp);
     }
