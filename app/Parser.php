@@ -133,8 +133,11 @@ final class Parser
                     default => 31,
                 };
                 for ($d = 1; $d <= $maxD; $d++) {
-                    $date = $y . '-' . ($m < 10 ? '0' : '') . $m . '-' . ($d < 10 ? '0' : '') . $d;
-                    $map[$date]  = $id;
+                    $date        = $y . '-' . ($m < 10 ? '0' : '') . $m . '-' . ($d < 10 ? '0' : '') . $d;
+                    // Store 7-char key (strip leading '2' from '2y-mm-dd' → 'y-mm-dd')
+                    // Matches substr($buffer, $comma + 4, 7) extraction in parseRange
+                    $key         = substr($date, 1);
+                    $map[$key]   = $id;
                     $list[$id++] = $date;
                 }
             }
@@ -210,41 +213,41 @@ final class Parser
 
             while ($p < $fence) {
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
             }
 
             while ($p < $lastNl) {
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
             }
         }
