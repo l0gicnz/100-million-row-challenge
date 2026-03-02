@@ -14,3 +14,4 @@ test-data-actual.json
 debug.php
 test.php
 benchmark.sh
+slug.sh
