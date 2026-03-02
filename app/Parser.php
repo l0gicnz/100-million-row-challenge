@@ -13,8 +13,6 @@ use function fseek;
 use function fwrite;
 use function fopen;
 use function fclose;
-use function fgets;
-use function ftell;
 use function implode;
 use function str_replace;
 use function count;
@@ -28,28 +26,9 @@ use const SEEK_CUR;
 final class Parser
 {
     private const int CHUNK_SIZE  = 2_097_152;
-    private const int READ_BUFFER = 163_840;
+    private const int READ_BUFFER = 1_048_576;
     private const int URI_OFFSET  = 25;
-
-    private const array SPLIT_OFFSETS = [
-        469_354_676,
-        938_709_353,
-        1_408_064_029,
-        1_877_418_706,
-        2_346_773_382,
-        2_816_128_059,
-        3_285_482_735,
-        3_754_837_412,
-        4_224_192_088,
-        4_693_546_765,
-        5_162_901_441,
-        5_632_256_118,
-        6_101_610_794,
-        6_570_965_471,
-        7_040_320_147,
-    ];
-
-    private const int FILE_SIZE = 7_509_674_827;
+    private const int FILE_SIZE   = 7_509_674_827;
 
     public static function parse(string $source, string $destination): void
     {
@@ -70,15 +49,11 @@ final class Parser
             $slugMap[$slug] = $id * $dateCount;
         }
 
-        $boundaries   = $this->calculateSplits($input);
-        $counts       = array_fill(0, $slugCount * $dateCount, 0);
-        $boundaryCount = count($boundaries) - 1;
+        $counts = array_fill(0, $slugCount * $dateCount, 0);
 
         $fh = fopen($input, 'rb');
         stream_set_read_buffer($fh, 0);
-        for ($c = 0; $c < $boundaryCount; $c++) {
-            $this->parseRange($fh, $boundaries[$c], $boundaries[$c + 1], $slugMap, $dateIds, $counts);
-        }
+        $this->parseRange($fh, 0, self::FILE_SIZE, $slugMap, $dateIds, $counts);
         fclose($fh);
 
         $this->generateJson($output, $counts, $slugs, $dateList);
@@ -96,7 +71,10 @@ final class Parser
                 };
                 for ($d = 1; $d <= $maxD; $d++) {
                     $date        = $y . '-' . ($m < 10 ? '0' : '') . $m . '-' . ($d < 10 ? '0' : '') . $d;
-                    $map[$date]  = $id;
+                    // Store 7-char key (strip leading '2' from '2y-mm-dd' → 'y-mm-dd')
+                    // Matches substr($buffer, $comma + 4, 7) extraction in parseRange
+                    $key         = substr($date, 1);
+                    $map[$key]   = $id;
                     $list[$id++] = $date;
                 }
             }
@@ -153,65 +131,49 @@ final class Parser
 
             while ($p < $fence) {
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
             }
 
             while ($p < $lastNl) {
                 $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 3, 8)]]++;
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
             }
         }
     }
 
-    private function calculateSplits(string $path): array
-    {
-        $pts = [0];
-        $fh  = fopen($path, 'rb');
-        foreach (self::SPLIT_OFFSETS as $offset) {
-            fseek($fh, $offset);
-            fgets($fh);
-            $pts[] = ftell($fh);
-        }
-        fclose($fh);
-        $pts[] = self::FILE_SIZE;
-        return $pts;
-    }
-
     private function generateJson(string $out, array $counts, array $slugs, array $dates): void
     {
         $fp = fopen($out, 'wb');
-        stream_set_write_buffer($fp, 1_048_576);
-        fwrite($fp, '{');
 
         $dCount = count($dates);
 
@@ -225,8 +187,10 @@ final class Parser
             $escapedSlugs[$idx] = "\"\\/blog\\/" . str_replace('/', '\\/', $slug) . "\"";
         }
 
+        $buf     = '{';
         $isFirst = true;
         $base    = 0;
+
         foreach ($slugs as $sIdx => $_) {
             $entries = [];
             for ($d = 0; $d < $dCount; $d++) {
@@ -237,12 +201,17 @@ final class Parser
             if ($entries) {
                 $comma   = $isFirst ? "" : ",";
                 $isFirst = false;
-                fwrite($fp, "$comma\n    {$escapedSlugs[$sIdx]}: {\n" . implode(",\n", $entries) . "\n    }");
+                $buf    .= "$comma\n    {$escapedSlugs[$sIdx]}: {\n" . implode(",\n", $entries) . "\n    }";
+
+                if (strlen($buf) > 65536) {
+                    fwrite($fp, $buf);
+                    $buf = '';
+                }
             }
             $base += $dCount;
         }
 
-        fwrite($fp, "\n}");
+        fwrite($fp, $buf . "\n}");
         fclose($fp);
     }
 }
