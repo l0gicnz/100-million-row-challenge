@@ -13,3 +13,4 @@ test-data-actual.json
 .benchmark
 debug.php
 test.php
+benchmark.sh
