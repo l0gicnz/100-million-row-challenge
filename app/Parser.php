@@ -5,9 +5,8 @@ namespace App;
 
 use function array_count_values;
 use function array_fill;
-use function array_filter;
-use function array_slice;
 use function chr;
+use function ord;
 use function count;
 use function date;
 use function fclose;
@@ -40,6 +39,7 @@ use function substr;
 use function sys_get_temp_dir;
 use function unlink;
 use function unpack;
+use function SplFixedArray;
 
 use const SEEK_CUR;
 use const SIGKILL;
@@ -92,16 +92,17 @@ final class Parser
         }
         unset($raw);
 
-        $dateChars = [];
+        $ymBase    = [];
         $dates     = [];
         $dateCount = 0;
         $ts        = strtotime($minDate) - 86400 * 60;
         $tsEnd     = strtotime($maxDate) + 86400 * 60;
 
         while ($ts <= $tsEnd) {
-            $full              = date('Y-m-d', $ts);
-            $key               = substr($full, 3);
-            $dateChars[$key]   = chr($dateCount & 0xFF) . chr($dateCount >> 8);
+            $full = date('Y-m-d', $ts);
+            if (substr($full, 8) === '01') {
+                $ymBase[(ord($full[3]) - 48) * 12 + (int)substr($full, 5, 2) - 1] = $dateCount;
+            }
             $dates[$dateCount] = $full;
             $dateCount++;
             $ts += 86400;
@@ -148,12 +149,12 @@ final class Parser
 
                 $buckets = array_fill(0, $pathCount, '');
                 [$from, $to] = $workerRanges[$w];
-                self::fillBuckets($fh, $from, $to, $dateChars, $pathIds, $buckets);
+                self::fillBuckets($fh, $from, $to, $ymBase, $pathIds, $buckets);
 
                 fclose($fh);
 
                 $counts = self::bucketsToCounts($buckets, $pathCount, $dateCount);
-                file_put_contents($outFile, pack('v*', ...$counts));
+                file_put_contents($outFile, pack('v*', ...$counts->toArray()));
 
                 posix_kill(posix_getpid(), SIGKILL);
             }
@@ -164,7 +165,7 @@ final class Parser
         stream_set_read_buffer($fh, 0);
         $buckets = array_fill(0, $pathCount, '');
         [$from, $to] = $workerRanges[self::WORKERS - 1];
-        self::fillBuckets($fh, $from, $to, $dateChars, $pathIds, $buckets);
+        self::fillBuckets($fh, $from, $to, $ymBase, $pathIds, $buckets);
         fclose($fh);
 
         $counts  = self::bucketsToCounts($buckets, $pathCount, $dateCount);
@@ -187,7 +188,7 @@ final class Parser
         self::writeJson($outputPath, $counts, $pathPrefixes, $datePrefixes, $pathCount, $dateCount);
     }
 
-    private static function fillBuckets($handle, int $start, int $end, array $dateChars, array $pathIds, array &$buckets): void
+    private static function fillBuckets($handle, int $start, int $end, array $ymBase, array $pathIds, array &$buckets): void
     {
         fseek($handle, $start);
         $remaining = $end - $start;
@@ -212,44 +213,49 @@ final class Parser
 
             while ($p < $fence) {
                 $sep = strpos($chunk, ',', $p);
-                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $did = $ymBase[(ord($chunk[$sep + 4]) - 48) * 12 + (ord($chunk[$sep + 6]) - 48) * 10 + ord($chunk[$sep + 7]) - 49] + (ord($chunk[$sep + 9]) - 48) * 10 + ord($chunk[$sep + 10]) - 49;
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= chr($did & 0xFF) . chr($did >> 8);
                 $p = $sep + 52;
 
                 $sep = strpos($chunk, ',', $p);
-                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $did = $ymBase[(ord($chunk[$sep + 4]) - 48) * 12 + (ord($chunk[$sep + 6]) - 48) * 10 + ord($chunk[$sep + 7]) - 49] + (ord($chunk[$sep + 9]) - 48) * 10 + ord($chunk[$sep + 10]) - 49;
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= chr($did & 0xFF) . chr($did >> 8);
                 $p = $sep + 52;
 
                 $sep = strpos($chunk, ',', $p);
-                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $did = $ymBase[(ord($chunk[$sep + 4]) - 48) * 12 + (ord($chunk[$sep + 6]) - 48) * 10 + ord($chunk[$sep + 7]) - 49] + (ord($chunk[$sep + 9]) - 48) * 10 + ord($chunk[$sep + 10]) - 49;
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= chr($did & 0xFF) . chr($did >> 8);
                 $p = $sep + 52;
 
                 $sep = strpos($chunk, ',', $p);
-                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $did = $ymBase[(ord($chunk[$sep + 4]) - 48) * 12 + (ord($chunk[$sep + 6]) - 48) * 10 + ord($chunk[$sep + 7]) - 49] + (ord($chunk[$sep + 9]) - 48) * 10 + ord($chunk[$sep + 10]) - 49;
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= chr($did & 0xFF) . chr($did >> 8);
                 $p = $sep + 52;
 
                 $sep = strpos($chunk, ',', $p);
-                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $did = $ymBase[(ord($chunk[$sep + 4]) - 48) * 12 + (ord($chunk[$sep + 6]) - 48) * 10 + ord($chunk[$sep + 7]) - 49] + (ord($chunk[$sep + 9]) - 48) * 10 + ord($chunk[$sep + 10]) - 49;
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= chr($did & 0xFF) . chr($did >> 8);
                 $p = $sep + 52;
 
                 $sep = strpos($chunk, ',', $p);
-                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $did = $ymBase[(ord($chunk[$sep + 4]) - 48) * 12 + (ord($chunk[$sep + 6]) - 48) * 10 + ord($chunk[$sep + 7]) - 49] + (ord($chunk[$sep + 9]) - 48) * 10 + ord($chunk[$sep + 10]) - 49;
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= chr($did & 0xFF) . chr($did >> 8);
                 $p = $sep + 52;
             }
 
             while ($p < $lastNl) {
                 $sep = strpos($chunk, ',', $p);
                 if ($sep === false || $sep >= $lastNl) break;
-                $slug = substr($chunk, $p, $sep - $p);
-                $key  = substr($chunk, $sep + 4, 7);
-                if (isset($dateChars[$key])) $buckets[$pathIds[$slug]] .= $dateChars[$key];
+                $did = $ymBase[(ord($chunk[$sep + 4]) - 48) * 12 + (ord($chunk[$sep + 6]) - 48) * 10 + ord($chunk[$sep + 7]) - 49] + (ord($chunk[$sep + 9]) - 48) * 10 + ord($chunk[$sep + 10]) - 49;
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= chr($did & 0xFF) . chr($did >> 8);
                 $p = $sep + 52;
             }
         }
     }
 
-    private static function bucketsToCounts(array &$buckets, int $pathCount, int $dateCount): array
+    private static function bucketsToCounts(array &$buckets, int $pathCount, int $dateCount): SplFixedArray
     {
-        $counts = array_fill(0, $pathCount * $dateCount, 0);
+        $counts = SplFixedArray::fromArray(array_fill(0, $pathCount * $dateCount, 0), false);
         for ($p = 0; $p < $pathCount; $p++) {
             if ($buckets[$p] === '') continue;
             $base = $p * $dateCount;
@@ -261,7 +267,7 @@ final class Parser
     }
 
     private static function writeJson(
-        string $outputPath, array $counts,
+        string $outputPath, SplFixedArray $counts,
         array $pathPrefixes, array $datePrefixes,
         int $pathCount, int $dateCount
     ): void {
@@ -274,16 +280,16 @@ final class Parser
         $base   = 0;
 
         for ($p = 0; $p < $pathCount; $p++) {
-            $nonZero = array_filter(array_slice($counts, $base, $dateCount));
-
-            if ($nonZero) {
-                $dateBuf = '';
-                $sep     = "\n";
-                foreach ($nonZero as $d => $n) {
+            $dateBuf = '';
+            $sep     = "\n";
+            for ($d = 0; $d < $dateCount; $d++) {
+                if ($n = $counts[$base + $d]) {
                     $dateBuf .= $sep . $datePrefixes[$d] . $n;
                     $sep = ",\n";
                 }
+            }
 
+            if ($dateBuf !== '') {
                 $entry   = ($first ? '' : ',') . $pathPrefixes[$p] . $dateBuf . "\n    }";
                 $first   = false;
                 $buf    .= $entry;
