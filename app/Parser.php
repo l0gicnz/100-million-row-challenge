@@ -2,11 +2,9 @@
 
 namespace App;
 
-use App\Commands\Visit;
 
 use function array_count_values;
 use function array_fill;
-use function array_fill_keys;
 use function array_filter;
 use function array_slice;
 use function chr;
@@ -52,7 +50,7 @@ final class Parser
     private const int WORKERS    = 8;
     private const int CHUNKS     = 8;
     private const int READ_CHUNK = 524_288;
-    private const int DISC_SIZE  = 2_097_152;
+    private const int DISC_SIZE  = 262_144;
     private const int PREFIX_LEN = 25;
 
     public function __call(string $name, array $arguments): mixed
@@ -94,15 +92,6 @@ final class Parser
         }
         unset($raw);
 
-        foreach (Visit::all() as $visit) {
-            $slug = substr($visit->uri, self::PREFIX_LEN);
-            if (!isset($pathIds[$slug])) {
-                $pathIds[$slug]    = $pathCount;
-                $paths[$pathCount] = $slug;
-                $pathCount++;
-            }
-        }
-
         $dateChars = [];
         $dates     = [];
         $dateCount = 0;
@@ -116,11 +105,6 @@ final class Parser
             $dates[$dateCount] = $full;
             $dateCount++;
             $ts += 86400;
-        }
-
-        $pathOffsets = [];
-        foreach ($pathIds as $slug => $id) {
-            $pathOffsets[$slug] = $id * $dateCount;
         }
 
         $datePrefixes = [];
@@ -162,13 +146,13 @@ final class Parser
                 $fh = fopen($inputPath, 'rb');
                 stream_set_read_buffer($fh, 0);
 
-                $buckets = array_fill_keys($paths, '');
+                $buckets = array_fill(0, $pathCount, '');
                 [$from, $to] = $workerRanges[$w];
-                self::fillBuckets($fh, $from, $to, $dateChars, $buckets);
+                self::fillBuckets($fh, $from, $to, $dateChars, $pathIds, $buckets);
 
                 fclose($fh);
 
-                $counts = self::bucketsToCounts($buckets, $pathOffsets, $pathCount, $dateCount);
+                $counts = self::bucketsToCounts($buckets, $pathCount, $dateCount);
                 file_put_contents($outFile, pack('v*', ...$counts));
 
                 posix_kill(posix_getpid(), SIGKILL);
@@ -178,12 +162,12 @@ final class Parser
 
         $fh      = fopen($inputPath, 'rb');
         stream_set_read_buffer($fh, 0);
-        $buckets = array_fill_keys($paths, '');
+        $buckets = array_fill(0, $pathCount, '');
         [$from, $to] = $workerRanges[self::WORKERS - 1];
-        self::fillBuckets($fh, $from, $to, $dateChars, $buckets);
+        self::fillBuckets($fh, $from, $to, $dateChars, $pathIds, $buckets);
         fclose($fh);
 
-        $counts  = self::bucketsToCounts($buckets, $pathOffsets, $pathCount, $dateCount);
+        $counts  = self::bucketsToCounts($buckets, $pathCount, $dateCount);
         $pending = count($childMap);
 
         while ($pending > 0) {
@@ -203,7 +187,7 @@ final class Parser
         self::writeJson($outputPath, $counts, $pathPrefixes, $datePrefixes, $pathCount, $dateCount);
     }
 
-    private static function fillBuckets($handle, int $start, int $end, array $dateChars, array &$buckets): void
+    private static function fillBuckets($handle, int $start, int $end, array $dateChars, array $pathIds, array &$buckets): void
     {
         fseek($handle, $start);
         $remaining = $end - $start;
@@ -228,27 +212,27 @@ final class Parser
 
             while ($p < $fence) {
                 $sep = strpos($chunk, ',', $p);
-                $buckets[substr($chunk, $p, $sep - $p)] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
                 $p = $sep + 52;
 
                 $sep = strpos($chunk, ',', $p);
-                $buckets[substr($chunk, $p, $sep - $p)] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
                 $p = $sep + 52;
 
                 $sep = strpos($chunk, ',', $p);
-                $buckets[substr($chunk, $p, $sep - $p)] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
                 $p = $sep + 52;
 
                 $sep = strpos($chunk, ',', $p);
-                $buckets[substr($chunk, $p, $sep - $p)] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
                 $p = $sep + 52;
 
                 $sep = strpos($chunk, ',', $p);
-                $buckets[substr($chunk, $p, $sep - $p)] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
                 $p = $sep + 52;
 
                 $sep = strpos($chunk, ',', $p);
-                $buckets[substr($chunk, $p, $sep - $p)] .= $dateChars[substr($chunk, $sep + 4, 7)];
+                $buckets[$pathIds[substr($chunk, $p, $sep - $p)]] .= $dateChars[substr($chunk, $sep + 4, 7)];
                 $p = $sep + 52;
             }
 
@@ -257,18 +241,19 @@ final class Parser
                 if ($sep === false || $sep >= $lastNl) break;
                 $slug = substr($chunk, $p, $sep - $p);
                 $key  = substr($chunk, $sep + 4, 7);
-                if (isset($dateChars[$key])) $buckets[$slug] .= $dateChars[$key];
+                if (isset($dateChars[$key])) $buckets[$pathIds[$slug]] .= $dateChars[$key];
                 $p = $sep + 52;
             }
         }
     }
 
-    private static function bucketsToCounts(array &$buckets, array $pathOffsets, int $pathCount, int $dateCount): array
+    private static function bucketsToCounts(array &$buckets, int $pathCount, int $dateCount): array
     {
         $counts = array_fill(0, $pathCount * $dateCount, 0);
-        foreach ($buckets as $slug => $bucket) {
-            $base = $pathOffsets[$slug];
-            foreach (array_count_values(unpack('v*', $bucket)) as $did => $cnt) {
+        for ($p = 0; $p < $pathCount; $p++) {
+            if ($buckets[$p] === '') continue;
+            $base = $p * $dateCount;
+            foreach (array_count_values(unpack('v*', $buckets[$p])) as $did => $cnt) {
                 $counts[$base + $did] += $cnt;
             }
         }

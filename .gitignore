@@ -13,5 +13,9 @@ test-data-actual.json
 .benchmark
 debug.php
 test.php
+parse.php
 benchmark.sh
 slug.sh
+
+gere-*
+mine_*
