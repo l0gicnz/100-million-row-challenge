@@ -102,11 +102,13 @@ final class Parser
         for ($d = 0; $d < $dateCount; $d++) {
             $datePrefixes[$d] = '        "' . $dates[$d] . '": ';
         }
+        unset($dates);
 
         $pathPrefixes = [];
         for ($p = 0; $p < $pathCount; $p++) {
             $pathPrefixes[$p] = "\n    \"\\/blog\\/" . str_replace('/', '\\/', $paths[$p]) . '": {';
         }
+        unset($paths);
 
         $splitPoints = [0];
         $bh = fopen($inputPath, 'rb');
@@ -117,11 +119,6 @@ final class Parser
         }
         fclose($bh);
         $splitPoints[] = $fileSize;
-
-        $workerRanges    = [];
-        for ($w = 0; $w < self::WORKERS; $w++) {
-            $workerRanges[$w] = [$splitPoints[$w], $splitPoints[$w + 1]];
-        }
 
         $myPid     = getmypid();
         $tmpDir    = is_dir('/dev/shm') ? '/dev/shm' : sys_get_temp_dir();
@@ -136,8 +133,7 @@ final class Parser
                 stream_set_read_buffer($fh, 0);
 
                 $buckets = array_fill(0, $pathCount, '');
-                [$from, $to] = $workerRanges[$w];
-                self::fillBuckets($fh, $from, $to, $dateChars, $pathIds, $buckets);
+                self::fillBuckets($fh, $splitPoints[$w], $splitPoints[$w + 1], $dateChars, $pathIds, $buckets);
 
                 fclose($fh);
 
@@ -152,8 +148,7 @@ final class Parser
         $fh      = fopen($inputPath, 'rb');
         stream_set_read_buffer($fh, 0);
         $buckets = array_fill(0, $pathCount, '');
-        [$from, $to] = $workerRanges[self::WORKERS - 1];
-        self::fillBuckets($fh, $from, $to, $dateChars, $pathIds, $buckets);
+        self::fillBuckets($fh, $splitPoints[self::WORKERS - 1], $splitPoints[self::WORKERS], $dateChars, $pathIds, $buckets);
         fclose($fh);
 
         $counts  = self::bucketsToCounts($buckets, $pathCount, $dateCount);
