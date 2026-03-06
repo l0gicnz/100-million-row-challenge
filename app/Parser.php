@@ -24,28 +24,11 @@ use const SEEK_CUR;
 
 final class Parser
 {
-    // M1 P-core L1 data cache = 192 KB = 12 × 16 KB pages.
-    // Fitting the hot chunk inside L1 means zero evictions during the inner loop.
-    // (M1 uses 16 KB pages vs 4 KB on x86 — all buffer sizes are 16 KB-aligned.)
-    private const int READ_CHUNK  = 196_608; // 192 KB
-
-    // 4 MB discovery read: enough to catch every unique slug in one fread on any
-    // realistic dataset, avoiding a second pass or conservative early-break.
-    private const int DISC_READ   = 4_194_304; // 4 MB
-
-    // 4 MB write buffer: amortises fwrite syscalls across M1's ~68 GB/s memory
-    // bandwidth — fewer kernel transitions during the JSON output phase.
-    private const int WRITE_BUF   = 4_194_304; // 4 MB
-
+    private const int READ_CHUNK  = 196_608;
+    private const int DISC_READ   = 4_194_304;
+    private const int WRITE_BUF   = 4_194_304;
     private const int URI_OFFSET  = 25;
-
-    // 10-way unroll: fence = 10 iterations × ~101 bytes/row = 1010.
-    // More unrolling reduces loop-branch overhead; M1's deep out-of-order
-    // execution window (~600 µops ROB) can absorb the extra ILP.
     private const int LOOP_FENCE  = 1010;
-
-    // Hint to strpos: the shortest valid slug is longer than this, so we skip
-    // the first few bytes of the slug field when scanning for the comma.
     private const int MIN_SLUG_LEN = 4;
 
     public static function parse(string $source, string $destination): void
@@ -64,13 +47,11 @@ final class Parser
 
         $slugMap = [];
         foreach ($slugs as $id => $slug) {
-            $slugMap[$slug] = $id * $dateCount; // pre-multiplied base offset
+            $slugMap[$slug] = $id * $dateCount;
         }
 
         $counts = array_fill(0, $slugCount * $dateCount, 0);
 
-        // Use filesize() — never hardcode FILE_SIZE; the benchmark harness may
-        // vary the input and a wrong constant silently truncates the last chunk.
         $fileSize = filesize($input);
 
         $fh = fopen($input, 'rb');
@@ -83,21 +64,17 @@ final class Parser
 
     private function buildDateRegistry(): array
     {
-        // Hard-coded 2021-2026 range: no strtotime/date() calls,
-        // no scanning the file for min/max — pure arithmetic.
         $map = []; $list = []; $id = 0;
         for ($y = 21; $y <= 26; $y++) {
             for ($m = 1; $m <= 12; $m++) {
                 $maxD = match ($m) {
-                    2       => ($y === 24) ? 29 : 28, // 2024 is the only leap year in range
+                    2       => ($y === 24) ? 29 : 28,
                     4, 6, 9, 11 => 30,
                     default => 31,
                 };
                 $mStr = ($m < 10 ? '0' : '') . $m;
                 for ($d = 1; $d <= $maxD; $d++) {
                     $dStr        = ($d < 10 ? '0' : '') . $d;
-                    // Key is 7 chars matching substr($buffer, $comma + 4, 7):
-                    // e.g. timestamp "2026-01-24T…" → $comma+4 = "6-01-24"
                     $key         = ($y % 10) . '-' . $mStr . '-' . $dStr;
                     $map[$key]   = $id;
                     $list[$id++] = "20{$y}-{$mStr}-{$dStr}";
@@ -110,7 +87,7 @@ final class Parser
     private function discoverSlugs(string $path): array
     {
         $fh  = fopen($path, 'rb');
-        $raw = fread($fh, self::DISC_READ); // 4 MB — catches all slugs in one shot
+        $raw = fread($fh, self::DISC_READ);
         fclose($fh);
 
         $slugs = [];
@@ -149,7 +126,6 @@ final class Parser
             $p     = self::URI_OFFSET;
             $fence = $lastNl - self::LOOP_FENCE;
 
-            // ── 10× unrolled hot loop ──────────────────────────────────────────
             while ($p < $fence) {
                 $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
@@ -192,7 +168,6 @@ final class Parser
                 $p = $comma + 52;
             }
 
-            // Tail: remaining rows in this chunk
             while ($p < $lastNl) {
                 $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
                 if ($comma === false || $comma >= $lastNl) break;
@@ -209,7 +184,6 @@ final class Parser
 
         $dCount = count($dates);
 
-        // Pre-build prefix strings once — avoids repeated string concat in the hot output loop
         $datePrefixes = [];
         for ($d = 0; $d < $dCount; $d++) {
             $datePrefixes[$d] = "        \"{$dates[$d]}\": ";
