@@ -2,6 +2,7 @@
 
 namespace App;
 
+
 use function strpos;
 use function strrpos;
 use function substr;
@@ -11,11 +12,11 @@ use function fseek;
 use function fwrite;
 use function fopen;
 use function fclose;
-use function filesize;
 use function implode;
 use function str_replace;
 use function count;
 use function array_fill;
+use function filesize;
 use function gc_disable;
 use function stream_set_read_buffer;
 use function stream_set_write_buffer;
@@ -24,12 +25,12 @@ use const SEEK_CUR;
 
 final class Parser
 {
-    private const int READ_CHUNK  = 196_608;
-    private const int DISC_READ   = 4_194_304;
-    private const int WRITE_BUF   = 4_194_304;
-    private const int URI_OFFSET  = 25;
-    private const int LOOP_FENCE  = 1010;
-    private const int MIN_SLUG_LEN = 4;
+    private const int DISC_READ     = 4_194_304;
+    private const int READ_BUFFER   = 196_608;
+    private const int URI_OFFSET    = 25;
+    private const int LOOP_FENCE    = 1010;
+    private const int MIN_SLUG_LEN  = 4;
+    private const int FLUSH_THRESH  = 1_048_576;
 
     public static function parse(string $source, string $destination): void
     {
@@ -52,11 +53,9 @@ final class Parser
 
         $counts = array_fill(0, $slugCount * $dateCount, 0);
 
-        $fileSize = filesize($input);
-
         $fh = fopen($input, 'rb');
         stream_set_read_buffer($fh, 0);
-        $this->parseRange($fh, 0, $fileSize, $slugMap, $dateIds, $counts);
+        $this->parseRange($fh, 0, filesize($input), $slugMap, $dateIds, $counts);
         fclose($fh);
 
         $this->generateJson($output, $counts, $slugs, $dateList);
@@ -68,16 +67,15 @@ final class Parser
         for ($y = 21; $y <= 26; $y++) {
             for ($m = 1; $m <= 12; $m++) {
                 $maxD = match ($m) {
-                    2       => ($y === 24) ? 29 : 28,
+                    2 => ($y % 4 === 0) ? 29 : 28,
                     4, 6, 9, 11 => 30,
                     default => 31,
                 };
-                $mStr = ($m < 10 ? '0' : '') . $m;
                 for ($d = 1; $d <= $maxD; $d++) {
-                    $dStr        = ($d < 10 ? '0' : '') . $d;
-                    $key         = ($y % 10) . '-' . $mStr . '-' . $dStr;
+                    $date        = $y . '-' . ($m < 10 ? '0' : '') . $m . '-' . ($d < 10 ? '0' : '') . $d;
+                    $key         = substr($date, 1);
                     $map[$key]   = $id;
-                    $list[$id++] = "20{$y}-{$mStr}-{$dStr}";
+                    $list[$id++] = $date;
                 }
             }
         }
@@ -103,18 +101,20 @@ final class Parser
         return array_keys($slugs);
     }
 
-    private function parseRange($fh, int $start, int $end, array $slugMap, array $dateIds, array &$counts): void
+    private function parseRange($fh, $start, $end, $slugMap, $dateIds, &$counts): void
     {
         fseek($fh, $start);
         $remaining = $end - $start;
+        $bufSize   = self::READ_BUFFER;
 
         while ($remaining > 0) {
-            $buffer = fread($fh, $remaining > self::READ_CHUNK ? self::READ_CHUNK : $remaining);
+            $buffer = fread($fh, $remaining > $bufSize ? $bufSize : $remaining);
             if ($buffer === false || $buffer === '') break;
 
-            $len        = strlen($buffer);
+            $len       = strlen($buffer);
             $remaining -= $len;
-            $lastNl     = strrpos($buffer, "\n");
+            $lastNl    = strrpos($buffer, "\n");
+
             if ($lastNl === false) break;
 
             $overhang = $len - $lastNl - 1;
@@ -170,7 +170,7 @@ final class Parser
 
             while ($p < $lastNl) {
                 $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
-                if ($comma === false || $comma >= $lastNl) break;
+                if ($comma === false) break;
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
             }
@@ -180,13 +180,13 @@ final class Parser
     private function generateJson(string $out, array $counts, array $slugs, array $dates): void
     {
         $fp = fopen($out, 'wb');
-        stream_set_write_buffer($fp, self::WRITE_BUF);
+        stream_set_write_buffer($fp, 4_194_304);
 
         $dCount = count($dates);
 
         $datePrefixes = [];
         for ($d = 0; $d < $dCount; $d++) {
-            $datePrefixes[$d] = "        \"{$dates[$d]}\": ";
+            $datePrefixes[$d] = "        \"20{$dates[$d]}\": ";
         }
 
         $escapedSlugs = [];
@@ -195,28 +195,25 @@ final class Parser
         }
 
         $buf     = '{';
-        $bufLen  = 1;
         $isFirst = true;
         $base    = 0;
 
         foreach ($slugs as $sIdx => $_) {
-            $entries = [];
+            $inner = '';
             for ($d = 0; $d < $dCount; $d++) {
                 if ($val = $counts[$base + $d]) {
-                    $entries[] = $datePrefixes[$d] . $val;
+                    $inner .= ",\n" . $datePrefixes[$d] . $val;
                 }
             }
-            if ($entries) {
-                $comma    = $isFirst ? '' : ',';
-                $isFirst  = false;
-                $entry    = "$comma\n    {$escapedSlugs[$sIdx]}: {\n" . implode(",\n", $entries) . "\n    }";
-                $buf     .= $entry;
-                $bufLen  += strlen($entry);
 
-                if ($bufLen > 65_536) {
+            if ($inner !== '') {
+                $sep     = $isFirst ? '' : ',';
+                $isFirst = false;
+                $buf .= "$sep\n    {$escapedSlugs[$sIdx]}: {\n" . substr($inner, 2) . "\n    }";
+
+                if (strlen($buf) > self::FLUSH_THRESH) {
                     fwrite($fp, $buf);
-                    $buf    = '';
-                    $bufLen = 0;
+                    $buf = '';
                 }
             }
             $base += $dCount;
