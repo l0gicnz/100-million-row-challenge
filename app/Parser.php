@@ -174,7 +174,7 @@ final class Parser
             }
 
             $p     = 25;
-            $fence = $lastNl - 1010;
+            $fence = $lastNl - 1002;
 
             while ($p < $fence) {
                 $sep = strpos($chunk, ',', $p + $minSlug);
