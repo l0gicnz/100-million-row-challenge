@@ -21,13 +21,7 @@ final class Parser
     private const int MIN_SLUG_LEN = 4;
     private const int FLUSH_THRESH = 1_048_576;
 
-    public static function parse(string $source, string $destination): void
-    {
-        gc_disable();
-        (new self())->execute($source, $destination);
-    }
-
-    public function execute(string $inputPath, string $outputPath): void
+    public static function parse($inputPath, $outputPath)
     {
         $dateIds = [];
         $dates = [];
@@ -100,14 +94,14 @@ final class Parser
         $sockets = [];
         for ($w = 0; $w < 8; $w++) {
             $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
-            stream_set_chunk_size($pair[0], 1048576);
+            stream_set_chunk_size($pair[0], $outputSize);
+            stream_set_chunk_size($pair[1], $outputSize);
             if (pcntl_fork() === 0) {
-                fclose($pair[0]);
-                $output = $this->parseRange(
+                //fclose($pair[0]);
+                fwrite($pair[1], self::parseRange(
                     $inputPath, $boundaries[$w], $boundaries[$w + 1],
                     $slugBaseMap, $dateIds, $next, $outputSize
-                );
-                fwrite($pair[1], $output);
+                ));
                 exit(0);
             }
             fclose($pair[1]);
@@ -138,10 +132,10 @@ final class Parser
             }
         }
 
-        $this->writeJson($outputPath, $counts, $paths, $dates, $di, $slugTotal);
+        self::writeJson($outputPath, $counts, $paths, $dates, $di, $slugTotal);
     }
 
-    private function parseRange(
+    private static function parseRange(
         string $inputPath,
         int $start,
         int $end,
@@ -240,7 +234,7 @@ final class Parser
         return $output;
     }
 
-    private function writeJson(
+    private static function writeJson(
         string $outputPath,
         array $counts,
         array $paths,
