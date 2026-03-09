@@ -23,7 +23,20 @@ final class Parser
 
     public static function parse($inputPath, $outputPath)
     {
+        if (gc_enabled()) {
+            gc_collect_cycles();
+        }
+        if (function_exists('gc_mem_caches')) {
+            gc_mem_caches();
+        }
         gc_disable();
+
+        if (function_exists('memory_reset_peak_usage')) {
+            memory_reset_peak_usage();
+        }
+        if (function_exists('pcntl_setpriority')) {
+            @pcntl_setpriority(-10);
+        }
 
         $dateIds = [];
         $dates = [];
@@ -94,12 +107,12 @@ final class Parser
         $boundaries[] = $fileSize;
 
         $sockets = [];
-        for ($w = 0; $w < 8; $w++) {
+        $w =8;
+        while ($w-- > 0) {   
             $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
             stream_set_chunk_size($pair[0], $outputSize);
             stream_set_chunk_size($pair[1], $outputSize);
             if (pcntl_fork() === 0) {
-                //fclose($pair[0]);
                 fwrite($pair[1], self::parseRange(
                     $inputPath, $boundaries[$w], $boundaries[$w + 1],
                     $slugBaseMap, $dateIds, $next, $outputSize
@@ -138,14 +151,8 @@ final class Parser
     }
 
     private static function parseRange(
-        string $inputPath,
-        int $start,
-        int $end,
-        array $slugBaseMap,
-        array $dateIds,
-        array $next,
-        int $outputSize,
-    ): string {
+        $inputPath, $start, $end, $slugBaseMap, $dateIds, $next, $outputSize,
+    ) {
         $output = str_repeat("\0", $outputSize);
         $handle = fopen($inputPath, 'rb');
         stream_set_read_buffer($handle, 0);
@@ -237,13 +244,8 @@ final class Parser
     }
 
     private static function writeJson(
-        string $outputPath,
-        array $counts,
-        array $paths,
-        array $dates,
-        int $dateCount,
-        int $slugCount,
-    ): void {
+        $outputPath, $counts, $paths, $dates, $dateCount, $slugCount,
+    ) {
         $out = fopen($outputPath, 'wb');
         stream_set_write_buffer($out, 4_194_304);
 
