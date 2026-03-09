@@ -2,7 +2,6 @@
 
 namespace App;
 
-
 use function strpos;
 use function strrpos;
 use function substr;
@@ -26,24 +25,20 @@ use const SEEK_CUR;
 final class Parser
 {
     private const int DISC_READ     = 4_194_304;
-    private const int READ_BUFFER   = 524_288;
+    private const int READ_BUFFER   = 1_048_576;
     private const int URI_OFFSET    = 25;
     private const int LOOP_FENCE    = 1010;
     private const int MIN_SLUG_LEN  = 4;
     private const int FLUSH_THRESH  = 1_048_576;
 
-    public static function parse(string $source, string $destination): void
+    public static function parse(string $input, string $output): void
     {
         gc_disable();
-        (new self())->execute($source, $destination);
-    }
 
-    private function execute(string $input, string $output): void
-    {
-        [$dateIds, $dateList] = $this->buildDateRegistry();
+        [$dateIds, $dateList] = self::buildDateRegistry();
         $dateCount = count($dateList);
 
-        $slugs     = $this->discoverSlugs($input);
+        $slugs     = self::discoverSlugs($input);
         $slugCount = count($slugs);
 
         $slugMap = [];
@@ -55,13 +50,13 @@ final class Parser
 
         $fh = fopen($input, 'rb');
         stream_set_read_buffer($fh, 0);
-        $this->parseRange($fh, 0, filesize($input), $slugMap, $dateIds, $counts);
+        self::parseRange($fh, 0, filesize($input), $slugMap, $dateIds, $counts);
         fclose($fh);
 
-        $this->generateJson($output, $counts, $slugs, $dateList);
+        self::generateJson($output, $counts, $slugs, $dateList);
     }
 
-    private function buildDateRegistry(): array
+    private static function buildDateRegistry(): array
     {
         $map = []; $list = []; $id = 0;
         for ($y = 21; $y <= 26; $y++) {
@@ -82,7 +77,7 @@ final class Parser
         return [$map, $list];
     }
 
-    private function discoverSlugs(string $path): array
+    private static function discoverSlugs(string $path): array
     {
         $fh  = fopen($path, 'rb');
         $raw = fread($fh, self::DISC_READ);
@@ -101,7 +96,7 @@ final class Parser
         return array_keys($slugs);
     }
 
-    private function parseRange($fh, $start, $end, $slugMap, $dateIds, &$counts): void
+    private static function parseRange($fh, $start, $end, $slugMap, $dateIds, &$counts): void
     {
         fseek($fh, $start);
         $remaining = $end - $start;
@@ -177,7 +172,7 @@ final class Parser
         }
     }
 
-    private function generateJson(string $out, array $counts, array $slugs, array $dates): void
+    private static function generateJson(string $out, array $counts, array $slugs, array $dates): void
     {
         $fp = fopen($out, 'wb');
         stream_set_write_buffer($fp, 4_194_304);
