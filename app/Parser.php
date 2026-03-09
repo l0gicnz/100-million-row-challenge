@@ -12,7 +12,6 @@ use function fseek;
 use function fwrite;
 use function fopen;
 use function fclose;
-use function implode;
 use function str_replace;
 use function count;
 use function array_fill;
@@ -26,7 +25,7 @@ use const SEEK_CUR;
 final class Parser
 {
     private const int DISC_READ     = 4_194_304;
-    private const int READ_BUFFER   = 196_608;
+    private const int READ_BUFFER   = 524_288;
     private const int URI_OFFSET    = 25;
     private const int LOOP_FENCE    = 1010;
     private const int MIN_SLUG_LEN  = 4;
@@ -43,13 +42,8 @@ final class Parser
         [$dateIds, $dateList] = $this->buildDateRegistry();
         $dateCount = count($dateList);
 
-        $slugs     = $this->discoverSlugs($input);
+        [$slugs, $slugMap] = $this->discoverSlugs($input, $dateCount);
         $slugCount = count($slugs);
-
-        $slugMap = [];
-        foreach ($slugs as $id => $slug) {
-            $slugMap[$slug] = $id * $dateCount;
-        }
 
         $counts = array_fill(0, $slugCount * $dateCount, 0);
 
@@ -82,23 +76,31 @@ final class Parser
         return [$map, $list];
     }
 
-    private function discoverSlugs(string $path): array
+    private function discoverSlugs(string $path, int $dateCount): array
     {
         $fh  = fopen($path, 'rb');
         $raw = fread($fh, self::DISC_READ);
         fclose($fh);
 
-        $slugs = [];
-        $pos   = 0;
-        $limit = strrpos($raw, "\n") ?: 0;
+        $slugs   = [];
+        $slugMap = [];
+        $id      = 0;
+        $pos     = 0;
+        $limit   = strrpos($raw, "\n") ?: 0;
+
         while ($pos < $limit) {
             $eol = strpos($raw, "\n", $pos + 52);
             if ($eol === false) break;
-            $slugs[substr($raw, $pos + self::URI_OFFSET, $eol - $pos - 51)] = true;
+            $slug = substr($raw, $pos + self::URI_OFFSET, $eol - $pos - 51);
+            if (!isset($slugMap[$slug])) {
+                $slugs[$id]      = $slug;
+                $slugMap[$slug]  = $id * $dateCount;
+                $id++;
+            }
             $pos = $eol + 1;
         }
 
-        return array_keys($slugs);
+        return [$slugs, $slugMap];
     }
 
     private function parseRange($fh, $start, $end, $slugMap, $dateIds, &$counts): void
@@ -194,22 +196,32 @@ final class Parser
             $escapedSlugs[$idx] = "\"\\/blog\\/" . str_replace('/', '\\/', $slug) . "\"";
         }
 
-        $buf     = '{';
-        $isFirst = true;
-        $base    = 0;
+        $buf      = '{';
+        $isFirst  = true;
+        $base     = 0;
 
         foreach ($slugs as $sIdx => $_) {
-            $inner = '';
+            $firstDate = -1;
             for ($d = 0; $d < $dCount; $d++) {
-                if ($val = $counts[$base + $d]) {
-                    $inner .= ",\n" . $datePrefixes[$d] . $val;
+                if ($counts[$base + $d] !== 0) {
+                    $firstDate = $d;
+                    break;
                 }
             }
 
-            if ($inner !== '') {
+            if ($firstDate !== -1) {
                 $sep     = $isFirst ? '' : ',';
                 $isFirst = false;
-                $buf .= "$sep\n    {$escapedSlugs[$sIdx]}: {\n" . substr($inner, 2) . "\n    }";
+                $buf    .= "$sep\n    {$escapedSlugs[$sIdx]}: {\n"
+                         . $datePrefixes[$firstDate] . $counts[$base + $firstDate];
+
+                for ($d = $firstDate + 1; $d < $dCount; $d++) {
+                    if ($val = $counts[$base + $d]) {
+                        $buf .= ",\n" . $datePrefixes[$d] . $val;
+                    }
+                }
+
+                $buf .= "\n    }";
 
                 if (strlen($buf) > self::FLUSH_THRESH) {
                     fwrite($fp, $buf);
