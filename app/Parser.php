@@ -189,16 +189,11 @@ final class Parser
             $datePrefixes[$d] = "        \"20{$dates[$d]}\": ";
         }
 
-        $escapedSlugs = [];
-        foreach ($slugs as $idx => $slug) {
-            $escapedSlugs[$idx] = "\"\\/blog\\/" . $slug . "\"";
-        }
-
         $buf     = '{';
         $isFirst = true;
         $base    = 0;
 
-        foreach ($slugs as $sIdx => $_) {
+        foreach ($slugs as $slug) {
             $parts = [];
             for ($d = 0; $d < $dCount; $d++) {
                 if ($val = $counts[$base + $d]) {
@@ -209,7 +204,7 @@ final class Parser
             if ($parts) {
                 $sep     = $isFirst ? '' : ',';
                 $isFirst = false;
-                $buf    .= "$sep\n    {$escapedSlugs[$sIdx]}: {\n" . implode(",\n", $parts) . "\n    }";
+                $buf    .= "$sep\n    \"\\/blog\\/$slug\": {\n" . implode(",\n", $parts) . "\n    }";
 
                 if (strlen($buf) > self::FLUSH_THRESH) {
                     fwrite($fp, $buf);
