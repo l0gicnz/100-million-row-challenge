@@ -13,6 +13,7 @@ test-data-actual.json
 .benchmark
 debug.php
 test.php
+tests.sh
 benchmark.sh
 gere-Parser.php
 gere-tempest
