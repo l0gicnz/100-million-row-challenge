@@ -199,17 +199,17 @@ final class Parser
         $base    = 0;
 
         foreach ($slugs as $sIdx => $_) {
-            $inner = '';
+            $parts = [];
             for ($d = 0; $d < $dCount; $d++) {
                 if ($val = $counts[$base + $d]) {
-                    $inner .= ",\n" . $datePrefixes[$d] . $val;
+                    $parts[] = $datePrefixes[$d] . $val;
                 }
             }
 
-            if ($inner !== '') {
+            if ($parts) {
                 $sep     = $isFirst ? '' : ',';
                 $isFirst = false;
-                $buf .= "$sep\n    {$escapedSlugs[$sIdx]}: {\n" . substr($inner, 2) . "\n    }";
+                $buf    .= "$sep\n    {$escapedSlugs[$sIdx]}: {\n" . implode(",\n", $parts) . "\n    }";
 
                 if (strlen($buf) > self::FLUSH_THRESH) {
                     fwrite($fp, $buf);
