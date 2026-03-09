@@ -12,6 +12,7 @@ use function fseek;
 use function fwrite;
 use function fopen;
 use function fclose;
+use function implode;
 use function str_replace;
 use function count;
 use function array_fill;
@@ -42,8 +43,13 @@ final class Parser
         [$dateIds, $dateList] = $this->buildDateRegistry();
         $dateCount = count($dateList);
 
-        [$slugs, $slugMap] = $this->discoverSlugs($input, $dateCount);
+        $slugs     = $this->discoverSlugs($input);
         $slugCount = count($slugs);
+
+        $slugMap = [];
+        foreach ($slugs as $id => $slug) {
+            $slugMap[$slug] = $id * $dateCount;
+        }
 
         $counts = array_fill(0, $slugCount * $dateCount, 0);
 
@@ -76,31 +82,23 @@ final class Parser
         return [$map, $list];
     }
 
-    private function discoverSlugs(string $path, int $dateCount): array
+    private function discoverSlugs(string $path): array
     {
         $fh  = fopen($path, 'rb');
         $raw = fread($fh, self::DISC_READ);
         fclose($fh);
 
-        $slugs   = [];
-        $slugMap = [];
-        $id      = 0;
-        $pos     = 0;
-        $limit   = strrpos($raw, "\n") ?: 0;
-
+        $slugs = [];
+        $pos   = 0;
+        $limit = strrpos($raw, "\n") ?: 0;
         while ($pos < $limit) {
             $eol = strpos($raw, "\n", $pos + 52);
             if ($eol === false) break;
-            $slug = substr($raw, $pos + self::URI_OFFSET, $eol - $pos - 51);
-            if (!isset($slugMap[$slug])) {
-                $slugs[$id]      = $slug;
-                $slugMap[$slug]  = $id * $dateCount;
-                $id++;
-            }
+            $slugs[substr($raw, $pos + self::URI_OFFSET, $eol - $pos - 51)] = true;
             $pos = $eol + 1;
         }
 
-        return [$slugs, $slugMap];
+        return array_keys($slugs);
     }
 
     private function parseRange($fh, $start, $end, $slugMap, $dateIds, &$counts): void
@@ -193,35 +191,25 @@ final class Parser
 
         $escapedSlugs = [];
         foreach ($slugs as $idx => $slug) {
-            $escapedSlugs[$idx] = "\"\\/blog\\/" . str_replace('/', '\\/', $slug) . "\"";
+            $escapedSlugs[$idx] = "\"\\/blog\\/" . $slug . "\"";
         }
 
-        $buf      = '{';
-        $isFirst  = true;
-        $base     = 0;
+        $buf     = '{';
+        $isFirst = true;
+        $base    = 0;
 
         foreach ($slugs as $sIdx => $_) {
-            $firstDate = -1;
+            $inner = '';
             for ($d = 0; $d < $dCount; $d++) {
-                if ($counts[$base + $d] !== 0) {
-                    $firstDate = $d;
-                    break;
+                if ($val = $counts[$base + $d]) {
+                    $inner .= ",\n" . $datePrefixes[$d] . $val;
                 }
             }
 
-            if ($firstDate !== -1) {
+            if ($inner !== '') {
                 $sep     = $isFirst ? '' : ',';
                 $isFirst = false;
-                $buf    .= "$sep\n    {$escapedSlugs[$sIdx]}: {\n"
-                         . $datePrefixes[$firstDate] . $counts[$base + $firstDate];
-
-                for ($d = $firstDate + 1; $d < $dCount; $d++) {
-                    if ($val = $counts[$base + $d]) {
-                        $buf .= ",\n" . $datePrefixes[$d] . $val;
-                    }
-                }
-
-                $buf .= "\n    }";
+                $buf .= "$sep\n    {$escapedSlugs[$sIdx]}: {\n" . substr($inner, 2) . "\n    }";
 
                 if (strlen($buf) > self::FLUSH_THRESH) {
                     fwrite($fp, $buf);
