@@ -31,9 +31,22 @@ final class Parser
     private const int MIN_SLUG_LEN  = 4;
     private const int FLUSH_THRESH  = 1_048_576;
 
-    public static function parse(string $input, string $output): void
+    public static function parse($input, $output)
     {
+        if (gc_enabled()) {
+            gc_collect_cycles();
+        }
+        if (function_exists('gc_mem_caches')) {
+            gc_mem_caches();
+        }
         gc_disable();
+
+        if (function_exists('memory_reset_peak_usage')) {
+            memory_reset_peak_usage();
+        }
+        if (function_exists('pcntl_setpriority')) {
+            @pcntl_setpriority(-10);
+        }
 
         [$dateIds, $dateList] = self::buildDateRegistry();
         $dateCount = count($dateList);
@@ -56,7 +69,7 @@ final class Parser
         self::generateJson($output, $counts, $slugs, $dateList);
     }
 
-    private static function buildDateRegistry(): array
+    private static function buildDateRegistry()
     {
         $map = []; $list = []; $id = 0;
         for ($y = 21; $y <= 26; $y++) {
@@ -77,7 +90,7 @@ final class Parser
         return [$map, $list];
     }
 
-    private static function discoverSlugs(string $path): array
+    private static function discoverSlugs($path)
     {
         $fh  = fopen($path, 'rb');
         $raw = fread($fh, self::DISC_READ);
@@ -96,7 +109,7 @@ final class Parser
         return array_keys($slugs);
     }
 
-    private static function parseRange($fh, $start, $end, $slugMap, $dateIds, &$counts): void
+    private static function parseRange($fh, $start, $end, $slugMap, $dateIds, &$counts)
     {
         fseek($fh, $start);
         $remaining = $end - $start;
@@ -172,7 +185,7 @@ final class Parser
         }
     }
 
-    private static function generateJson(string $out, array $counts, array $slugs, array $dates): void
+    private static function generateJson($out, $counts, $slugs, $dates)
     {
         $fp = fopen($out, 'wb');
         stream_set_write_buffer($fp, 4_194_304);
