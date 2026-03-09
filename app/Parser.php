@@ -23,6 +23,8 @@ final class Parser
 
     public static function parse($inputPath, $outputPath)
     {
+        gc_disable();
+
         $dateIds = [];
         $dates = [];
         $di = 0;
