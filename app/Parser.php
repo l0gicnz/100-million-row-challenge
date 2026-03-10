@@ -134,7 +134,10 @@ final class Parser
 
             $alive = [];
 
-            foreach ($read as $key => $socket) {
+            foreach ($sockets as $key => $socket) {
+                if (!in_array($socket, $read, true)) {
+                    continue;
+                }
                 $data = fread($socket, $outputSize);
 
                 if ($data !== '') {
