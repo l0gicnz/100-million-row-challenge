@@ -12,7 +12,6 @@ use function fwrite;
 use function fopen;
 use function fclose;
 use function implode;
-use function str_replace;
 use function count;
 use function array_fill;
 use function filesize;
@@ -25,13 +24,13 @@ use const SEEK_CUR;
 final class Parser
 {
     private const int DISC_READ     = 4_194_304;
-    private const int READ_BUFFER   = 1_048_576;
+    private const int READ_BUFFER   = 524_288;
     private const int URI_OFFSET    = 25;
-    private const int LOOP_FENCE    = 1010;
+    private const int LOOP_FENCE    = 404;
     private const int MIN_SLUG_LEN  = 4;
     private const int FLUSH_THRESH  = 1_048_576;
 
-    public static function parse($input, $output)
+     public static function parse($input, $output)
     {
         if (gc_enabled()) {
             gc_collect_cycles();
@@ -105,7 +104,6 @@ final class Parser
             $slugs[substr($raw, $pos + self::URI_OFFSET, $eol - $pos - 51)] = true;
             $pos = $eol + 1;
         }
-
         return array_keys($slugs);
     }
 
@@ -149,31 +147,7 @@ final class Parser
 
                 $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
+                $p = $comma + 52;                
             }
 
             while ($p < $lastNl) {
@@ -187,6 +161,7 @@ final class Parser
 
     private static function generateJson($out, $counts, $slugs, $dates)
     {
+        $start = microtime(true);
         $fp = fopen($out, 'wb');
         stream_set_write_buffer($fp, 4_194_304);
 
