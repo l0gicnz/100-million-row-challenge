@@ -24,7 +24,7 @@ use const SEEK_CUR;
 final class Parser
 {
     private const int DISC_READ     = 4_194_304;
-    private const int READ_BUFFER   = 524_288;
+    private const int READ_BUFFER   = 1_048_576;
     private const int URI_OFFSET    = 25;
     private const int LOOP_FENCE    = 404;
     private const int MIN_SLUG_LEN  = 4;
