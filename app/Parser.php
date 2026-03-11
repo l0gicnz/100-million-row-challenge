@@ -18,7 +18,7 @@ final class Parser
 {
     private const int DISC_READ   = 2_097_152;
     private const int READ_BUFFER = 65_536;
-    private const int WORKERS     = 4;
+    private const int WORKERS     = 10;
 
     public static function parse($inputPath, $outputPath)
     {
