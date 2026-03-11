@@ -11,7 +11,6 @@ use function fseek;
 use function fwrite;
 use function fopen;
 use function fclose;
-use function implode;
 use function count;
 use function array_fill;
 use function filesize;
@@ -23,29 +22,14 @@ use const SEEK_CUR;
 
 final class Parser
 {
-    private const int DISC_READ     = 4_194_304;
-    private const int READ_BUFFER   = 1_048_576;
-    private const int URI_OFFSET    = 25;
-    private const int LOOP_FENCE    = 404;
-    private const int MIN_SLUG_LEN  = 4;
-    private const int FLUSH_THRESH  = 1_048_576;
+    private const int DISC_READ   = 4_194_304;
+    private const int READ_BUFFER = 1_048_576;
+    private const int URI_OFFSET  = 25;
+    private const int LOOP_FENCE  = 404;
 
-     public static function parse($input, $output)
+    public static function parse($input, $output)
     {
-        if (gc_enabled()) {
-            gc_collect_cycles();
-        }
-        if (function_exists('gc_mem_caches')) {
-            gc_mem_caches();
-        }
         gc_disable();
-
-        if (function_exists('memory_reset_peak_usage')) {
-            memory_reset_peak_usage();
-        }
-        if (function_exists('pcntl_setpriority')) {
-            @pcntl_setpriority(-10);
-        }
 
         [$dateIds, $dateList] = self::buildDateRegistry();
         $dateCount = count($dateList);
@@ -95,15 +79,24 @@ final class Parser
         $raw = fread($fh, self::DISC_READ);
         fclose($fh);
 
-        $slugs = [];
-        $pos   = 0;
-        $limit = strrpos($raw, "\n") ?: 0;
+        $slugs  = [];
+        $pos    = 0;
+        $limit  = strrpos($raw, "\n") ?: 0;
+        $noNew  = 0;
+
         while ($pos < $limit) {
             $eol = strpos($raw, "\n", $pos + 52);
             if ($eol === false) break;
-            $slugs[substr($raw, $pos + self::URI_OFFSET, $eol - $pos - 51)] = true;
+            $slug = substr($raw, $pos + self::URI_OFFSET, $eol - $pos - 51);
+            if (!isset($slugs[$slug])) {
+                $slugs[$slug] = true;
+                $noNew = 0;
+            } elseif (++$noNew > 180) {
+                break;
+            }
             $pos = $eol + 1;
         }
+
         return array_keys($slugs);
     }
 
@@ -133,25 +126,25 @@ final class Parser
             $fence = $lastNl - self::LOOP_FENCE;
 
             while ($p < $fence) {
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
+                $comma = strpos($buffer, ',', $p);
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
+                $comma = strpos($buffer, ',', $p);
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
+                $comma = strpos($buffer, ',', $p);
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
 
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
+                $comma = strpos($buffer, ',', $p);
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;                
+                $p = $comma + 52;
             }
 
             while ($p < $lastNl) {
-                $comma = strpos($buffer, ',', $p + self::MIN_SLUG_LEN);
+                $comma = strpos($buffer, ',', $p);
                 if ($comma === false) break;
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
@@ -161,9 +154,9 @@ final class Parser
 
     private static function generateJson($out, $counts, $slugs, $dates)
     {
-        $start = microtime(true);
         $fp = fopen($out, 'wb');
-        stream_set_write_buffer($fp, 4_194_304);
+        stream_set_write_buffer($fp, 1_048_576);
+        fwrite($fp, '{');
 
         $dCount = count($dates);
 
@@ -172,32 +165,38 @@ final class Parser
             $datePrefixes[$d] = "        \"20{$dates[$d]}\": ";
         }
 
-        $buf     = '{';
-        $isFirst = true;
-        $base    = 0;
+        $sep  = "\n    ";
+        $base = 0;
 
         foreach ($slugs as $slug) {
-            $parts = [];
+            $firstDate = -1;
             for ($d = 0; $d < $dCount; $d++) {
-                if ($val = $counts[$base + $d]) {
-                    $parts[] = $datePrefixes[$d] . $val;
+                if ($counts[$base + $d] !== 0) {
+                    $firstDate = $d;
+                    break;
                 }
             }
 
-            if ($parts) {
-                $sep     = $isFirst ? '' : ',';
-                $isFirst = false;
-                $buf    .= "$sep\n    \"\\/blog\\/$slug\": {\n" . implode(",\n", $parts) . "\n    }";
-
-                if (strlen($buf) > self::FLUSH_THRESH) {
-                    fwrite($fp, $buf);
-                    $buf = '';
-                }
+            if ($firstDate === -1) {
+                $base += $dCount;
+                continue;
             }
+
+            $buf = $sep . "\"\\/blog\\/$slug\": {\n" . $datePrefixes[$firstDate] . $counts[$base + $firstDate];
+            $sep = ",\n    ";
+
+            for ($d = $firstDate + 1; $d < $dCount; $d++) {
+                $count = $counts[$base + $d];
+                if ($count === 0) continue;
+                $buf .= ",\n" . $datePrefixes[$d] . $count;
+            }
+
+            $buf .= "\n    }";
+            fwrite($fp, $buf);
             $base += $dCount;
         }
 
-        fwrite($fp, $buf . "\n}");
+        fwrite($fp, "\n}");
         fclose($fp);
     }
 }
