@@ -25,7 +25,7 @@ final class Parser
     private const int DISC_READ   = 4_194_304;
     private const int READ_BUFFER = 1_048_576;
     private const int URI_OFFSET  = 25;
-    private const int LOOP_FENCE  = 1010;
+    private const int LOOP_FENCE  = 2020;
 
     public static function parse($input, $output)
     {
@@ -91,7 +91,7 @@ final class Parser
             if (!isset($slugs[$slug])) {
                 $slugs[$slug] = true;
                 $noNew = 0;
-            } elseif (++$noNew > 1900) {
+            } elseif (++$noNew > 2000) {
                 break;
             }
             $pos = $eol + 1;
@@ -126,6 +126,46 @@ final class Parser
             $fence = $lastNl - self::LOOP_FENCE;
 
             while ($p < $fence) {
+                $comma = strpos($buffer, ',', $p);
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
+                $p = $comma + 52;
+                
+                $comma = strpos($buffer, ',', $p);
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
+                $p = $comma + 52;
+
+                $comma = strpos($buffer, ',', $p);
+                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
+                $p = $comma + 52;
+                
                 $comma = strpos($buffer, ',', $p);
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
