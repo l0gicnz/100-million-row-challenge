@@ -31,7 +31,8 @@ use const STREAM_SOCK_STREAM;
 
 final class Parser
 {
-    private const int DISC_READ   = 2_097_152;
+    //private const int DISC_READ   = 2_097_152;
+    private const int DISC_READ   = 1_048_576;
     private const int WORKERS     = 8;
 
     public static function parse($inputPath, $outputPath)
@@ -84,7 +85,7 @@ final class Parser
                 $slugBaseMap[$slug] = $slugTotal * $di;
                 $slugTotal++;
                 $noNew = 0;
-            } elseif (++$noNew > 1900) {
+            } elseif (++$noNew > 2000) {
                 break;
             }
             $pos = $nl + 1;
@@ -135,49 +136,9 @@ final class Parser
                         }
 
                         $p = 25;
-                        $fence = $lastNl - 2020;
+                        $fence = $lastNl - 1010;
 
                         while ($p < $fence) {
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
                             $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
                             $output[$idx] = $next[$output[$idx]];
                             $p = $sep + 52;
@@ -233,14 +194,13 @@ final class Parser
             fclose($pair[1]);
             $sockets[$w] = $pair[0];
         }
-
         $buffers = array_fill(0, self::WORKERS, '');
 
         $write = [];
         $except = [];
         while ($sockets !== []) {
             $read = $sockets;
-            stream_select($read, $write, $except, 5);
+            stream_select($read, $write, $except, null);
             foreach ($read as $key => $socket) {
                 $data = fread($socket, $outputSize << 1);
                 if ($data !== '' && $data !== false) {
@@ -254,8 +214,7 @@ final class Parser
         }
 
         $merged = $buffers[0];
-        $w = self::WORKERS;
-        while ($w-- > 0) {
+        for ($w = 1; $w < self::WORKERS; $w++) {
             sodium_add($merged, $buffers[$w]);
         }
         $counts = array_values(unpack('v*', $merged));
@@ -267,7 +226,8 @@ final class Parser
         $outputPath, $counts, $paths, $dates, $dateCount, $slugCount,
     ) {
         $out = fopen($outputPath, 'wb');
-        stream_set_write_buffer($out, 1_048_576);
+        //stream_set_write_buffer($out, 1_048_576);
+        stream_set_write_buffer($out, 2_097_152);
 
         $datePrefixes = [];
         for ($d = 0; $d < $dateCount; $d++) {
