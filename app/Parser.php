@@ -18,7 +18,7 @@ final class Parser
 {
     private const int DISC_READ   = 2_097_152;
     private const int READ_BUFFER = 65_536;
-    private const int WORKERS     = 10;
+    private const int WORKERS     = 8;
 
     public static function parse($inputPath, $outputPath)
     {
@@ -71,7 +71,7 @@ final class Parser
                 $slugBaseMap[$slug] = $slugTotal * $di;
                 $slugTotal++;
                 $noNew = 0;
-            } else if (++$noNew > 180) {
+            } else if (++$noNew > 2500) {
                 break;
             }
             $pos = $nl + 1;
