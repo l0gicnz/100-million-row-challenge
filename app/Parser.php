@@ -91,7 +91,7 @@ final class Parser
             if (!isset($slugs[$slug])) {
                 $slugs[$slug] = true;
                 $noNew = 0;
-            } elseif (++$noNew > 2000) {
+            } elseif (++$noNew > 1900) {
                 break;
             }
             $pos = $eol + 1;
