@@ -32,7 +32,7 @@ use const STREAM_SOCK_STREAM;
 final class Parser
 {
     private const int DISC_READ   = 1_048_576;
-    private const int WORKERS     = 8;
+    private const int WORKERS     = 10;
 
     public static function parse($inputPath, $outputPath)
     {
