@@ -31,9 +31,9 @@ use const STREAM_SOCK_STREAM;
 
 final class Parser
 {
-    //private const int DISC_READ   = 2_097_152;
-    private const int DISC_READ   = 1_048_576;
-    private const int WORKERS     = 8;
+    private const DISC_READ   = 2_097_152;
+    private const READ_CHUNK  = 262_144;
+    private const WORKERS     = 8;
 
     public static function parse($inputPath, $outputPath)
     {
@@ -122,7 +122,7 @@ final class Parser
                 $remaining = $boundaries[$w + 1] - $boundaries[$w];
 
                     while ($remaining > 0) {
-                        $chunk = fread($handle, $remaining > 163_840 ? 163_840 : $remaining);
+                        $chunk = fread($handle, $remaining > self::READ_CHUNK ? self::READ_CHUNK : $remaining);
                         $chunkLen = strlen($chunk);
                         $remaining -= $chunkLen;
 
@@ -188,7 +188,7 @@ final class Parser
                         }
                     }
                 fclose($handle);
-                fwrite($pair[1], chunk_split($output, 1, "\0"));
+                fwrite($pair[1], $output);
                 exit(0);
             }
             fclose($pair[1]);
@@ -217,7 +217,7 @@ final class Parser
         for ($w = 1; $w < self::WORKERS; $w++) {
             sodium_add($merged, $buffers[$w]);
         }
-        $counts = array_values(unpack('v*', $merged));
+        $counts = array_values(unpack('C*', $merged));
 
         self::writeJson($outputPath, $counts, $paths, $dates, $di, $slugTotal);
     }
@@ -226,7 +226,6 @@ final class Parser
         $outputPath, $counts, $paths, $dates, $dateCount, $slugCount,
     ) {
         $out = fopen($outputPath, 'wb');
-        //stream_set_write_buffer($out, 1_048_576);
         stream_set_write_buffer($out, 2_097_152);
 
         $datePrefixes = [];
