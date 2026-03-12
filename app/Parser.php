@@ -11,6 +11,8 @@ use function fseek;
 use function fwrite;
 use function fopen;
 use function fclose;
+use function implode;
+use function str_replace;
 use function count;
 use function array_fill;
 use function filesize;
@@ -22,10 +24,11 @@ use const SEEK_CUR;
 
 final class Parser
 {
-    private const int DISC_READ   = 4_194_304;
-    private const int READ_BUFFER = 1_048_576;
-    private const int URI_OFFSET  = 25;
-    private const int LOOP_FENCE  = 2020;
+    private const int DISC_READ     = 4_194_304;
+    private const int READ_BUFFER   = 1_048_576;
+    private const int URI_OFFSET    = 25;
+    private const int LOOP_FENCE    = 1010;
+    private const int FLUSH_THRESH  = 1_048_576;
 
     public static function parse($input, $output)
     {
@@ -79,21 +82,13 @@ final class Parser
         $raw = fread($fh, self::DISC_READ);
         fclose($fh);
 
-        $slugs  = [];
-        $pos    = 0;
-        $limit  = strrpos($raw, "\n") ?: 0;
-        $noNew  = 0;
-
+        $slugs = [];
+        $pos   = 0;
+        $limit = strrpos($raw, "\n") ?: 0;
         while ($pos < $limit) {
             $eol = strpos($raw, "\n", $pos + 52);
             if ($eol === false) break;
-            $slug = substr($raw, $pos + self::URI_OFFSET, $eol - $pos - 51);
-            if (!isset($slugs[$slug])) {
-                $slugs[$slug] = true;
-                $noNew = 0;
-            } elseif (++$noNew > 2000) {
-                break;
-            }
+            $slugs[substr($raw, $pos + self::URI_OFFSET, $eol - $pos - 51)] = true;
             $pos = $eol + 1;
         }
 
@@ -141,47 +136,7 @@ final class Parser
                 $comma = strpos($buffer, ',', $p);
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
-                
-                $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
 
-                $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-                
-                $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-
-                $comma = strpos($buffer, ',', $p);
-                $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
-                $p = $comma + 52;
-                
                 $comma = strpos($buffer, ',', $p);
                 $counts[$slugMap[substr($buffer, $p, $comma - $p)] + $dateIds[substr($buffer, $comma + 4, 7)]]++;
                 $p = $comma + 52;
@@ -219,8 +174,7 @@ final class Parser
     private static function generateJson($out, $counts, $slugs, $dates)
     {
         $fp = fopen($out, 'wb');
-        stream_set_write_buffer($fp, 1_048_576);
-        fwrite($fp, '{');
+        stream_set_write_buffer($fp, 4_194_304);
 
         $dCount = count($dates);
 
@@ -229,38 +183,32 @@ final class Parser
             $datePrefixes[$d] = "        \"20{$dates[$d]}\": ";
         }
 
-        $sep  = "\n    ";
-        $base = 0;
+        $buf     = '{';
+        $isFirst = true;
+        $base    = 0;
 
         foreach ($slugs as $slug) {
-            $firstDate = -1;
+            $parts = [];
             for ($d = 0; $d < $dCount; $d++) {
-                if ($counts[$base + $d] !== 0) {
-                    $firstDate = $d;
-                    break;
+                if ($val = $counts[$base + $d]) {
+                    $parts[] = $datePrefixes[$d] . $val;
                 }
             }
 
-            if ($firstDate === -1) {
-                $base += $dCount;
-                continue;
+            if ($parts) {
+                $sep     = $isFirst ? '' : ',';
+                $isFirst = false;
+                $buf    .= "$sep\n    \"\\/blog\\/$slug\": {\n" . implode(",\n", $parts) . "\n    }";
+
+                if (strlen($buf) > self::FLUSH_THRESH) {
+                    fwrite($fp, $buf);
+                    $buf = '';
+                }
             }
-
-            $buf = $sep . "\"\\/blog\\/$slug\": {\n" . $datePrefixes[$firstDate] . $counts[$base + $firstDate];
-            $sep = ",\n    ";
-
-            for ($d = $firstDate + 1; $d < $dCount; $d++) {
-                $count = $counts[$base + $d];
-                if ($count === 0) continue;
-                $buf .= ",\n" . $datePrefixes[$d] . $count;
-            }
-
-            $buf .= "\n    }";
-            fwrite($fp, $buf);
             $base += $dCount;
         }
 
-        fwrite($fp, "\n}");
+        fwrite($fp, $buf . "\n}");
         fclose($fp);
     }
 }
