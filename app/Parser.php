@@ -84,7 +84,7 @@ final class Parser
                 $slugBaseMap[$slug] = $slugTotal * $di;
                 $slugTotal++;
                 $noNew = 0;
-            } elseif (++$noNew > 2000) {
+            } elseif (++$noNew > 1750) {
                 break;
             }
             $pos = $nl + 1;
@@ -233,7 +233,8 @@ final class Parser
             fclose($pair[1]);
             $sockets[$w] = $pair[0];
         }
-        $buffers = array_fill(0, 8, '');
+
+        $buffers = array_fill(0, self::WORKERS, '');
 
         $write = [];
         $except = [];
@@ -253,7 +254,8 @@ final class Parser
         }
 
         $merged = $buffers[0];
-        for ($w = 1; $w < 8; $w++) {
+        $w = self::WORKERS;
+        while ($w-- > 0) {
             sodium_add($merged, $buffers[$w]);
         }
         $counts = array_values(unpack('v*', $merged));
