@@ -84,7 +84,7 @@ final class Parser
                 $slugBaseMap[$slug] = $slugTotal * $di;
                 $slugTotal++;
                 $noNew = 0;
-            } elseif (++$noNew > 1750) {
+            } elseif (++$noNew > 1900) {
                 break;
             }
             $pos = $nl + 1;
