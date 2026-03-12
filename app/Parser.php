@@ -31,9 +31,8 @@ use const STREAM_SOCK_STREAM;
 
 final class Parser
 {
-    private const DISC_READ   = 2_097_152;
-    private const READ_CHUNK  = 262_144;
-    private const WORKERS     = 8;
+    private const int DISC_READ   = 1_048_576;
+    private const int WORKERS     = 8;
 
     public static function parse($inputPath, $outputPath)
     {
@@ -85,7 +84,7 @@ final class Parser
                 $slugBaseMap[$slug] = $slugTotal * $di;
                 $slugTotal++;
                 $noNew = 0;
-            } elseif (++$noNew > 2000) {
+            } elseif (++$noNew > 2500) {
                 break;
             }
             $pos = $nl + 1;
@@ -122,7 +121,7 @@ final class Parser
                 $remaining = $boundaries[$w + 1] - $boundaries[$w];
 
                     while ($remaining > 0) {
-                        $chunk = fread($handle, $remaining > self::READ_CHUNK ? self::READ_CHUNK : $remaining);
+                        $chunk = fread($handle, $remaining > 327_680 ? 327_680 : $remaining);
                         $chunkLen = strlen($chunk);
                         $remaining -= $chunkLen;
 
@@ -188,7 +187,7 @@ final class Parser
                         }
                     }
                 fclose($handle);
-                fwrite($pair[1], $output);
+                fwrite($pair[1], chunk_split($output, 1, "\0"));
                 exit(0);
             }
             fclose($pair[1]);
@@ -217,7 +216,7 @@ final class Parser
         for ($w = 1; $w < self::WORKERS; $w++) {
             sodium_add($merged, $buffers[$w]);
         }
-        $counts = array_values(unpack('C*', $merged));
+        $counts = array_values(unpack('v*', $merged));
 
         self::writeJson($outputPath, $counts, $paths, $dates, $di, $slugTotal);
     }
