@@ -122,7 +122,7 @@ final class Parser
                 $remaining = $boundaries[$w + 1] - $boundaries[$w];
 
                     while ($remaining > 0) {
-                        $chunk = fread($handle, $remaining > 1_048_576 ? 1_048_576 : $remaining);
+                        $chunk = fread($handle, $remaining > 524_288 ? 524_288 : $remaining);
                         $chunkLen = strlen($chunk);
                         $remaining -= $chunkLen;
 
@@ -136,57 +136,9 @@ final class Parser
                         }
 
                         $p = 25;
-                        $fence = $lastNl - 1980;
+                        $fence = $lastNl - 792;
 
                         while ($p < $fence) {
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-                            
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
-                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $p = $sep + 52;
-
                             $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
                             $output[$idx] = $next[$output[$idx]];
                             $p = $sep + 52;
