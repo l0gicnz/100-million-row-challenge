@@ -39,22 +39,25 @@ final class Parser
         gc_disable();
 
         $dateIds = [];
+        $dateIds = array_fill(0, 2200, null);
         $dates = [];
         $di = 0;
+
+        $monthDays = [31,28,31,30,31,30,31,31,30,31,30,31];
         for ($y = 1; $y <= 6; $y++) {
             $year = 2020 + $y;
+            $days = $monthDays;
+            if ($year === 2024) {
+                $days[1] = 29;
+            }
             for ($m = 1; $m <= 12; $m++) {
-                $maxD = match ($m) {
-                    2 => $year === 2024 ? 29 : 28,
-                    4, 6, 9, 11 => 30,
-                    default => 31,
-                };
-                $mStr = ($m < 10 ? '0' : '') . $m;
+                $mStr = $m < 10 ? "0$m" : (string)$m;
                 $ymStr = $y . '-' . $mStr . '-';
-                for ($d = 1; $d <= $maxD; $d++) {
-                    $dStr = ($d < 10 ? '0' : '') . $d;
+                $yearPrefix = $year . '-' . $mStr . '-';
+                for ($d = 1; $d <= $days[$m - 1]; $d++) {
+                    $dStr = $d < 10 ? "0$d" : (string)$d;
                     $dateIds[$ymStr . $dStr] = $di;
-                    $dates[$di] = $year . '-' . $mStr . '-' . $dStr;
+                    $dates[$di] = $yearPrefix . $dStr;
                     $di++;
                 }
             }
@@ -142,7 +145,6 @@ final class Parser
                     $fence = $lastNl - 792;
 
                     while ($p < $fence) {
-
                         $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
                         $output[$idx] = $next[$output[$idx]];
                         $p = $sep + 52;
