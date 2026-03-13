@@ -25,7 +25,7 @@ final class Parser
     private const int INITIAL_READ  = 181_000;
     private const int DISC_READ     = 1_048_576;
     private const int CHUNK_READ    = 1_048_576;
-    private const int UNROLL        = 10;
+    private const int UNROLL        = 8;
     private const string URL_PREFIX = 'https://stitcher.io/blog/';
 
     public static function parse($inputPath, $outputPath)
