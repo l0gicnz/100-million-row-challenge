@@ -111,17 +111,18 @@ final class Parser
         $w = self::WORKERS;
         while ($w-- > 0) {
             $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
-            stream_set_chunk_size($pair[0], $outputSize);
-            stream_set_chunk_size($pair[1], $outputSize);
+            stream_set_chunk_size($pair[0], $outputSize * 2);
+            stream_set_chunk_size($pair[1], $outputSize * 2);
             if (pcntl_fork() === 0) {
                 $output = str_repeat("\0", $outputSize);
                 $handle = fopen($inputPath, 'rb');
                 stream_set_read_buffer($handle, 0);
+                stream_set_write_buffer($pair[1], $outputSize * 2);
                 fseek($handle, $boundaries[$w]);
                 $remaining = $boundaries[$w + 1] - $boundaries[$w];
 
                     while ($remaining > 0) {
-                        $chunk = fread($handle, $remaining > 327_680 ? 327_680 : $remaining);
+                        $chunk = fread($handle, $remaining > 1_048_576 ? 1_048_576 : $remaining);
                         $chunkLen = strlen($chunk);
                         $remaining -= $chunkLen;
 
@@ -135,7 +136,7 @@ final class Parser
                         }
 
                         $p = 25;
-                        $fence = $lastNl - 1010;
+                        $fence = $lastNl - 990;
 
                         while ($p < $fence) {
                             $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
