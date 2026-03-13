@@ -40,7 +40,7 @@ final class Parser
     private const int SLUG_TOTAL   = 268;
     private const int DATE_COUNT   = 2191;
     private const int INITIAL_READ = 181_000;
-    private const int DISC_READ    = 1_048_576;
+    private const int DISC_READ    = 2_097_152;
     private const int CHUNK_READ   = 163_840;
     private const int UNROLL       = 10;
     private const int CHUNK_GRAIN  = 8_388_608;
@@ -193,6 +193,16 @@ final class Parser
 
                         $pos = $lastNl;
                         while ($pos > $batchLimit) {
+                            $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
+                            $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $pos -= $token >> $shift;
+
+                            $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
+                            $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $pos -= $token >> $shift;
+
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
                             $output[$idx] = $next[$output[$idx]];
