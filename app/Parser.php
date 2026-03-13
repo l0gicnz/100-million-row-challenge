@@ -36,7 +36,7 @@ use const STREAM_SOCK_STREAM;
 
 final class Parser
 {
-    private const int WORKERS      = 9;
+    private const int WORKERS      = 8;
     private const int SLUG_TOTAL   = 268;
     private const int DATE_COUNT   = 2191;
     private const int INITIAL_READ = 181_000;
@@ -193,16 +193,6 @@ final class Parser
 
                         $pos = $lastNl;
                         while ($pos > $batchLimit) {
-                            $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
-                            $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $pos -= $token >> $shift;
-
-                            $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
-                            $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $pos -= $token >> $shift;
-
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
                             $output[$idx] = $next[$output[$idx]];
