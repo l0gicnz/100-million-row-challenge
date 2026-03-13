@@ -42,7 +42,7 @@ final class Parser
     private const int INITIAL_READ = 181_000;
     private const int DISC_READ    = 2_097_152;
     private const int CHUNK_READ   = 163_840;
-    private const int UNROLL       = 10;
+    private const int UNROLL       = 8;
     private const int CHUNK_GRAIN  = 8_388_608;
     private const string URL_PREF  = 'https://stitcher.io/blog/';
 
