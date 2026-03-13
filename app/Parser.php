@@ -117,7 +117,8 @@ final class Parser
                 $remaining = $boundaries[$w + 1] - $boundaries[$w];
 
                     while ($remaining > 0) {
-                        $chunk = fread($handle, $remaining > 131_072 ? 131_072 : $remaining);
+                        $chunk = fread($handle, $remaining > 163_840 ? 163_840 : $remaining);
+                        //$chunk = fread($handle, $remaining > 131_072 ? 131_072 : $remaining);
                         $chunkLen = strlen($chunk);
                         $remaining -= $chunkLen;
 
@@ -189,6 +190,7 @@ final class Parser
             fclose($pair[1]);
             $sockets[$w] = $pair[0];
         }
+        unset($slugBaseMap, $dateIds, $boundaries, $next);
         $buffers = array_fill(0, self::WORKERS, '');
 
         $write = [];
@@ -209,12 +211,15 @@ final class Parser
         }
 
         $merged = $buffers[0];
+        unset($buffers[0]);
         for ($w = 1; $w < self::WORKERS; $w++) {
             sodium_add($merged, $buffers[$w]);
         }
         $counts = array_values(unpack('v*', $merged));
+        unset($merged);
 
         self::writeJson($outputPath, $counts, $paths, $dates, $di, $slugTotal);
+        unset($counts, $paths, $dates);
     }
 
     private static function writeJson(
