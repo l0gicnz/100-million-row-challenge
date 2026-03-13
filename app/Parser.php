@@ -11,19 +11,7 @@ use function feof;
 use function fopen;
 use function fread;
 use function fseek;
-use function ftok;
 use function fwrite;
-use function pack;
-use function pcntl_fork;
-use function sem_acquire;
-use function sem_get;
-use function sem_release;
-use function sem_remove;
-use function shmop_close;
-use function shmop_delete;
-use function shmop_open;
-use function shmop_read;
-use function shmop_write;
 use function sodium_add;
 use function stream_select;
 use function stream_set_chunk_size;
@@ -43,10 +31,8 @@ use const STREAM_SOCK_STREAM;
 
 final class Parser
 {
-    private const int DISC_READ = 1_048_576;
-    private const int WORKERS   = 8;
-    private const int CHUNKS    = 64;
-    private const int SLUGS     = 269;
+    private const int DISC_READ   = 1_048_576;
+    private const int WORKERS     = 4;
 
     public static function parse($inputPath, $outputPath)
     {
@@ -88,7 +74,7 @@ final class Parser
         $pos = 0;
         $lastNl = strrpos($raw, "\n") ?: 0;
 
-        while ($pos < $lastNl && $slugTotal < self::SLUGS) {
+        while ($pos < $lastNl && $slugTotal < 268) {
             $nl = strpos($raw, "\n", $pos + 52);
             if ($nl === false) break;
             $slug = substr($raw, $pos + 25, $nl - $pos - 51);
@@ -106,10 +92,9 @@ final class Parser
         stream_set_read_buffer($bh, 8192);
         fseek($bh, 0, SEEK_END);
         $fileSize = ftell($bh);
-
-        $step = (int)($fileSize / self::CHUNKS);
+        $step = (int)($fileSize / self::WORKERS);
         $boundaries = [0];
-        for ($i = 1; $i < self::CHUNKS; $i++) {
+        for ($i = 1; $i < self::WORKERS; $i++) {
             fseek($bh, $step * $i);
             fgets($bh);
             $boundaries[] = ftell($bh);
@@ -117,39 +102,22 @@ final class Parser
         fclose($bh);
         $boundaries[] = $fileSize;
 
-        $shmKey = ftok(__FILE__, 'p');
-        $shm    = shmop_open($shmKey, 'c', 0600, 4);
-        shmop_write($shm, pack('V', 0), 0);
-
-        $semKey = ftok(__FILE__, 'q');
-        $sem    = sem_get($semKey, 1, 0600, true);
-
         $sockets = [];
-        for ($w = 0; $w < self::WORKERS; $w++) {
+
+        $w = self::WORKERS;
+        while ($w-- > 0) {
             $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
             stream_set_chunk_size($pair[0], $outputSize);
             stream_set_chunk_size($pair[1], $outputSize);
             if (pcntl_fork() === 0) {
-                fclose($pair[0]);
                 $output = str_repeat("\0", $outputSize);
                 $handle = fopen($inputPath, 'rb');
                 stream_set_read_buffer($handle, 0);
-
-                while (true) {
-                    sem_acquire($sem);
-                    $chunkIdx = unpack('V', shmop_read($shm, 0, 4))[1];
-                    if ($chunkIdx >= self::CHUNKS) {
-                        sem_release($sem);
-                        break;
-                    }
-                    shmop_write($shm, pack('V', $chunkIdx + 1), 0);
-                    sem_release($sem);
-
-                    fseek($handle, $boundaries[$chunkIdx]);
-                    $remaining = $boundaries[$chunkIdx + 1] - $boundaries[$chunkIdx];
+                fseek($handle, $boundaries[$w]);
+                $remaining = $boundaries[$w + 1] - $boundaries[$w];
 
                     while ($remaining > 0) {
-                        $chunk = fread($handle, $remaining > 131_072 ? 131_072 : $remaining);
+                        $chunk = fread($handle, $remaining > 163_840 ? 163_840 : $remaining);
                         $chunkLen = strlen($chunk);
                         $remaining -= $chunkLen;
 
@@ -214,18 +182,15 @@ final class Parser
                             $p = $sep + 52;
                         }
                     }
-                }
-
                 fclose($handle);
                 fwrite($pair[1], chunk_split($output, 1, "\0"));
-                fclose($pair[1]);
                 exit(0);
             }
             fclose($pair[1]);
             $sockets[$w] = $pair[0];
         }
-
         $buffers = array_fill(0, self::WORKERS, '');
+
         $write = [];
         $except = [];
         while ($sockets !== []) {
@@ -242,9 +207,6 @@ final class Parser
                 }
             }
         }
-
-        shmop_delete($shm);
-        sem_remove($sem);
 
         $merged = $buffers[0];
         for ($w = 1; $w < self::WORKERS; $w++) {
