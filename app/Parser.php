@@ -117,7 +117,7 @@ final class Parser
                 $remaining = $boundaries[$w + 1] - $boundaries[$w];
 
                     while ($remaining > 0) {
-                        $chunk = fread($handle, $remaining > 163_840 ? 163_840 : $remaining);
+                        $chunk = fread($handle, $remaining > 131_072 ? 131_072 : $remaining);
                         $chunkLen = strlen($chunk);
                         $remaining -= $chunkLen;
 
