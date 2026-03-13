@@ -172,14 +172,6 @@ final class Parser
                 $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                 $counts[($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)]]++;
                 $pos -= $token >> $shift;
-
-                $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
-                $counts[($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)]]++;
-                $pos -= $token >> $shift;
-
-                $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
-                $counts[($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)]]++;
-                $pos -= $token >> $shift;
             }
 
             while ($pos >= $keyOffset) {
