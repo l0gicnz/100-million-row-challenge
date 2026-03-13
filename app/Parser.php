@@ -31,7 +31,7 @@ use const STREAM_SOCK_STREAM;
 
 final class Parser
 {
-    private const int DISC_READ   = 4_194_304;
+    private const int DISC_READ   = 1_048_576;
     private const int WORKERS     = 8;
 
     public static function parse($inputPath, $outputPath)
@@ -121,7 +121,7 @@ final class Parser
                 $remaining = $boundaries[$w + 1] - $boundaries[$w];
 
                     while ($remaining > 0) {
-                        $chunk = fread($handle, $remaining > 262_144 ? 262_144 : $remaining);
+                        $chunk = fread($handle, $remaining > 163_840 ? 163_840 : $remaining);
                         $chunkLen = strlen($chunk);
                         $remaining -= $chunkLen;
 
@@ -135,7 +135,7 @@ final class Parser
                         }
 
                         $p = 25;
-                        $fence = $lastNl - 990;
+                        $fence = $lastNl - 1010;
 
                         while ($p < $fence) {
                             $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
@@ -193,13 +193,13 @@ final class Parser
             fclose($pair[1]);
             $sockets[$w] = $pair[0];
         }
-        $buffers = array_fill(0, 8, '');
+        $buffers = array_fill(0, self::WORKERS, '');
 
         $write = [];
         $except = [];
         while ($sockets !== []) {
             $read = $sockets;
-            stream_select($read, $write, $except, 5);
+            stream_select($read, $write, $except, null);
             foreach ($read as $key => $socket) {
                 $data = fread($socket, $outputSize << 1);
                 if ($data !== '' && $data !== false) {
@@ -213,7 +213,7 @@ final class Parser
         }
 
         $merged = $buffers[0];
-        for ($w = 1; $w < 8; $w++) {
+        for ($w = 1; $w < self::WORKERS; $w++) {
             sodium_add($merged, $buffers[$w]);
         }
         $counts = array_values(unpack('v*', $merged));
@@ -225,7 +225,7 @@ final class Parser
         $outputPath, $counts, $paths, $dates, $dateCount, $slugCount,
     ) {
         $out = fopen($outputPath, 'wb');
-        stream_set_write_buffer($out, 1_048_576);
+        stream_set_write_buffer($out, 2_097_152);
 
         $datePrefixes = [];
         for ($d = 0; $d < $dateCount; $d++) {
