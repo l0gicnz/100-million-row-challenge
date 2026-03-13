@@ -32,7 +32,7 @@ use const STREAM_SOCK_STREAM;
 final class Parser
 {
     private const int DISC_READ   = 1_048_576;
-    private const int WORKERS     = 10;
+    private const int WORKERS     = 8;
 
     public static function parse($inputPath, $outputPath)
     {
@@ -136,9 +136,49 @@ final class Parser
                         }
 
                         $p = 25;
-                        $fence = $lastNl - 990;
+                        $fence = $lastNl - 1980;
 
                         while ($p < $fence) {
+                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $p = $sep + 52;
+
+                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $p = $sep + 52;
+
+                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $p = $sep + 52;
+
+                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $p = $sep + 52;
+
+                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $p = $sep + 52;
+
+                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $p = $sep + 52;
+
+                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $p = $sep + 52;
+
+                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $p = $sep + 52;
+
+                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $p = $sep + 52;
+
+                            $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $p = $sep + 52;
+                            
                             $idx = $slugBaseMap[substr($chunk, $p, ($sep = strpos($chunk, ',', $p)) - $p)] + $dateIds[substr($chunk, $sep + 4, 7)];
                             $output[$idx] = $next[$output[$idx]];
                             $p = $sep + 52;
