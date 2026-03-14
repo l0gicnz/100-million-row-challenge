@@ -5,6 +5,7 @@ namespace App;
 use function array_fill;
 use function chr;
 use function chunk_split;
+use function count;
 use function fclose;
 use function feof;
 use function fgets;
@@ -159,7 +160,7 @@ final class Parser
         $keyOffset = 26 + $keyBytes;
         $slotMask = (1 << 20) - 1;
         $batchLimit = ($maxStride * self::UNROLL) + $keyOffset;
-        $chunkCount = \count($chunks);
+        $chunkCount = count($chunks);
 
         $sockets = [];
         for ($w = 0; $w < self::WORKERS; $w++) {
@@ -298,7 +299,7 @@ final class Parser
     private static function writeJson($outputPath, $counts, $paths, $dates, $dateCount, $slugTotal)
     {
         $out = fopen($outputPath, 'wb');
-        stream_set_write_buffer($out, 1_048_576);
+        stream_set_write_buffer($out, 2_097_152);
         fwrite($out, '{');
 
         $datePrefixes = [];
