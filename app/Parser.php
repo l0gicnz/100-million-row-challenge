@@ -18,7 +18,6 @@ use function gc_disable;
 use function pcntl_fork;
 use function sodium_add;
 use function str_repeat;
-use function str_replace;
 use function stream_select;
 use function stream_set_chunk_size;
 use function stream_set_read_buffer;
@@ -43,9 +42,10 @@ final class Parser
     private const int INITIAL_READ = 181_000;
     private const int DISC_READ    = 1_048_576;
     private const int CHUNK_READ   = 163_840;
-    private const int UNROLL       = 10;
+    private const int UNROLL       = 8;
     private const int CHUNK_GRAIN  = 8_388_608;
     private const string URL_PREF  = 'https://stitcher.io/blog/';
+    
 
     public static function parse($inputPath, $outputPath)
     {
@@ -88,7 +88,7 @@ final class Parser
             $slug = substr($raw, $pos + 25, $nl - $pos - 51);
             if (! isset($seen[$slug])) {
                 $paths[$slugTotal] = $slug;
-                $seen[$slug] = $slugTotal * $dc;
+                $seen[$slug] = true;
                 $slugTotal++;
             }
             $pos = $nl + 1;
@@ -108,7 +108,7 @@ final class Parser
                     $slug = substr($chunk, $pos, $sep - $pos);
                     if (! isset($seen[$slug])) {
                         $paths[$slugTotal] = $slug;
-                        $seen[$slug] = $slugTotal * $dc;
+                        $seen[$slug] = true;
                         $slugTotal++;
                         if ($slugTotal === self::SLUG_TOTAL) { break 2; }
                     }
@@ -196,70 +196,49 @@ final class Parser
                         while ($pos > $batchLimit) {
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
+                            $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> $shift;
 
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
+                            $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> $shift;
 
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
+                            $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> $shift;
 
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
+                            $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> $shift;
 
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
+                            $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> $shift;
 
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
+                            $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> $shift;
 
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
+                            $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> $shift;
 
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
-                            $pos -= $token >> $shift;
-
-                            $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
-                            $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
-                            $pos -= $token >> $shift;
-
-                            $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
-                            $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
+                            $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> $shift;
                         }
 
                         while ($pos >= $keyOffset) {
                             $token = $slugLookup[substr($chunk, $pos - $keyOffset, $keyBytes)];
                             $idx = ($token & $slotMask) + $dateIds[substr($chunk, $pos - $dateOff, $dateLen)];
-                            $tmp = $output[$idx];
-                            $output[$idx] = $next[$tmp];
+                            $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> $shift;
                         }
                     }
@@ -299,7 +278,7 @@ final class Parser
     private static function writeJson($outputPath, $counts, $paths, $dates, $dateCount, $slugTotal)
     {
         $out = fopen($outputPath, 'wb');
-        stream_set_write_buffer($out, 2_097_152);
+        stream_set_write_buffer($out, 1_048_576);
         fwrite($out, '{');
 
         $datePrefixes = [];
