@@ -36,14 +36,14 @@ use const STREAM_SOCK_STREAM;
 
 final class Parser
 {
-    private const int WORKERS      = 4;
+    private const int WORKERS      = 8;
     private const int SLUG_TOTAL   = 268;
     private const int DATE_COUNT   = 2191;
     private const int INITIAL_READ = 181_000;
     private const int DISC_READ    = 1_048_576;
-    private const int CHUNK_READ   = 262_144;
-    private const int UNROLL       = 16;
-    private const CHUNK_GRAIN      = 1 << 25;
+    private const int CHUNK_READ   = 163_840;
+    private const int UNROLL       = 10;
+    private const int CHUNK_GRAIN  = 1 << 25;
     private const string URL_PREF  = 'https://stitcher.io/blog/';
 
 
@@ -227,36 +227,6 @@ final class Parser
                             $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
                             $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> 20;
-
-                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $pos -= $token >> 20;
-
-                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $pos -= $token >> 20;
-
-                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $pos -= $token >> 20;
-
-                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $pos -= $token >> 20;
-
-                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $pos -= $token >> 20;
-
-                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                            $output[$idx] = $next[$output[$idx]];
-                            $pos -= $token >> 20;
                         }
 
                         while ($pos >= 48) {
@@ -343,36 +313,6 @@ final class Parser
                     $parentOutput[$idx] = $next[$parentOutput[$idx]];
                     $pos -= $token >> 20;
                     
-                    $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                    $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                    $parentOutput[$idx] = $next[$parentOutput[$idx]];
-                    $pos -= $token >> 20;
-
-                    $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                    $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                    $parentOutput[$idx] = $next[$parentOutput[$idx]];
-                    $pos -= $token >> 20;
-
-                    $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                    $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                    $parentOutput[$idx] = $next[$parentOutput[$idx]];
-                    $pos -= $token >> 20;
-
-                    $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                    $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                    $parentOutput[$idx] = $next[$parentOutput[$idx]];
-                    $pos -= $token >> 20;
-
-                    $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                    $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                    $parentOutput[$idx] = $next[$parentOutput[$idx]];
-                    $pos -= $token >> 20;
-
-                    $token = $slugLookup[substr($chunk, $pos - 48, 22)];
-                    $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
-                    $parentOutput[$idx] = $next[$parentOutput[$idx]];
-                    $pos -= $token >> 20;
-
                     $token = $slugLookup[substr($chunk, $pos - 48, 22)];
                     $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
                     $parentOutput[$idx] = $next[$parentOutput[$idx]];
