@@ -227,6 +227,16 @@ final class Parser
                             $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
                             $output[$idx] = $next[$output[$idx]];
                             $pos -= $token >> 20;
+
+                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
+                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $pos -= $token >> 20;
+
+                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
+                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $pos -= $token >> 20;
                         }
 
                         while ($pos >= 48) {
@@ -318,6 +328,16 @@ final class Parser
                     $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
                     $parentOutput[$idx] = $next[$parentOutput[$idx]];
                     $pos -= $token >> 20;
+
+                    $token = $slugLookup[substr($chunk, $pos - 48, 22)];
+                    $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
+                    $parentOutput[$idx] = $next[$parentOutput[$idx]];
+                    $pos -= $token >> 20;
+
+                    $token = $slugLookup[substr($chunk, $pos - 48, 22)];
+                    $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
+                    $parentOutput[$idx] = $next[$parentOutput[$idx]];
+                    $pos -= $token >> 20;
                 }
 
                 while ($pos >= 48) {
@@ -355,7 +375,7 @@ final class Parser
     private static function writeJson($outputPath, $counts, $paths, $dates, $dateCount, $slugTotal)
     {
         $out = fopen($outputPath, 'wb');
-        stream_set_write_buffer($out, 2_097_152);
+        stream_set_write_buffer($out, 1_048_576);
         fwrite($out, '{');
 
         $datePrefixes = [];
