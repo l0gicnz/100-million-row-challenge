@@ -262,6 +262,10 @@ final class Parser
         $handle = fopen($inputPath, 'rb');
         stream_set_read_buffer($handle, 0);
 
+        $buffers = array_fill(1, self::WORKERS - 1, '');
+        $write = [];
+        $except = [];
+
         for ($ci = 0; $ci < $chunkCount; $ci += self::WORKERS) {
             [$start, $end] = $chunks[$ci];
             fseek($handle, $start);
@@ -347,13 +351,20 @@ final class Parser
                     $pos -= $token >> 20;
                 }
             }
+
+            if ($sockets !== []) {
+                $read = $sockets;
+                if (stream_select($read, $write, $except, 0)) {
+                    foreach ($read as $id => $s) {
+                        $data = fread($s, $frameBytes);
+                        if ($data !== '' && $data !== false) { $buffers[$id] .= $data; }
+                        if (feof($s)) { fclose($s); unset($sockets[$id]); }
+                    }
+                }
+            }
         }
 
         fclose($handle);
-
-        $buffers = array_fill(0, self::WORKERS, '');
-        $write = [];
-        $except = [];
 
         while ($sockets !== []) {
             $read = $sockets;
