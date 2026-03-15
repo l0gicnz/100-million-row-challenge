@@ -405,7 +405,7 @@ final class Parser
             }
         }
 
-        $merged = $parentOutput;
+        $merged = chunk_split($parentOutput, 1, "\0");
         for ($w = self::WORKERS - 1; $w > 0; $w--) { sodium_add($merged, $buffers[$w]); }
 
         $counts = unpack('v*', $merged);
