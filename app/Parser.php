@@ -41,7 +41,7 @@ final class Parser
     private const int DATE_COUNT   = 2191;
     private const int INITIAL_READ = 181_000;
     private const int DISC_READ    = 1_048_576;
-    private const int CHUNK_READ   = 131_072;  // 128 KB, power-of-2 aligned
+    private const int CHUNK_READ   = 262_144;
     private const int UNROLL       = 12;
     private const CHUNK_GRAIN      = 1 << 25;
     private const string URL_PREF  = 'https://stitcher.io/blog/';
@@ -136,8 +136,6 @@ final class Parser
 
         fclose($fh);
 
-        // Fixed at 22: minimum suffix length to uniquely identify all 268 slugs.
-        // $keyOffset = 26 + 22 = 48 (inlined in the hot loop below).
         $maxStride = 0;
         $slugLookup = [];
         foreach ($paths as $id => $slug) {
@@ -148,7 +146,6 @@ final class Parser
 
         $bucketSize = $slugTotal * $dc;
         $frameBytes = $bucketSize << 1;
-        // batchLimit uses 48 = keyOffset (26 + 22), and UNROLL = 12
         $batchLimit = ($maxStride * self::UNROLL) + 48;
         $chunkCount = count($chunks);
 
