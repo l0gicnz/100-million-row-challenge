@@ -42,7 +42,7 @@ final class Parser
     private const int INITIAL_READ = 181_000;
     private const int DISC_READ    = 1_048_576;
     private const int CHUNK_READ   = 262_144;
-    private const int UNROLL       = 12;
+    private const int UNROLL       = 16;
     private const CHUNK_GRAIN      = 1 << 25;
     private const string URL_PREF  = 'https://stitcher.io/blog/';
 
@@ -178,6 +178,26 @@ final class Parser
 
                         $pos = $lastNl;
                         while ($pos > $batchLimit) {
+                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
+                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $pos -= $token >> 20;
+
+                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
+                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $pos -= $token >> 20;
+
+                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
+                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $pos -= $token >> 20;
+
+                            $token = $slugLookup[substr($chunk, $pos - 48, 22)];
+                            $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
+                            $output[$idx] = $next[$output[$idx]];
+                            $pos -= $token >> 20;
+
                             $token = $slugLookup[substr($chunk, $pos - 48, 22)];
                             $idx = ($token & 1048575) + $dateIds[substr($chunk, $pos - 22, 7)];
                             $output[$idx] = $next[$output[$idx]];
