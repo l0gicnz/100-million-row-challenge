@@ -36,7 +36,7 @@ use const STREAM_SOCK_STREAM;
 
 final class Parser
 {
-    private const int WORKERS      = 8;
+    private const int WORKERS      = 4;
     private const int SLUG_TOTAL   = 268;
     private const int DATE_COUNT   = 2191;
     private const int INITIAL_READ = 181_000;
