@@ -36,14 +36,14 @@ use const STREAM_SOCK_STREAM;
 
 final class Parser
 {
-    private const int WORKERS      = 9;
+    private const int WORKERS      = 8;
     private const int SLUG_TOTAL   = 268;
     private const int DATE_COUNT   = 2191;
     private const int INITIAL_READ = 181_000;
     private const int DISC_READ    = 1_048_576;
     private const int CHUNK_READ   = 163_840;
     private const int UNROLL       = 10;
-    private const int CHUNK_GRAIN  = 8_388_608;
+    private const CHUNK_GRAIN = 1 << 30; // 1 GB
     private const string URL_PREF  = 'https://stitcher.io/blog/';
     
 
